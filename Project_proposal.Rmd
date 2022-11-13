@@ -1,0 +1,49 @@
+---
+title: "Project proposal"
+author: "Etienne Rolland"
+date: "2022-11-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Topic
+
+Identify the subject of your project. What are you going to be making your visualizations about?
+
+Some examples of possible topics:
+* Educational achievement in a country/province/city
+* Sports - player statistics and performance of a team
+* Political survey data like what we've used in previous courses in this specialization
+* Business data - prices, company performance, budget data, productivity data
+
+Please indicate in as much detail as possible what the topic is going to be.
+
+## Data Sources
+
+Please identify the source(s) of data you will use for your project. Provide links to websites and citations for the data. Who created these data? How were they collected?
+
+## Description of the Data
+
+Please provide specific details about your data.
+ 
+* If the data covers a timespan, what is the time period?
+* If the data covers a geographical location, what geographical location(s)?
+* If the data is about a business, political, or non-governmental entity or activity, which entities or activities does it cover? For example is the data about economics, schools, politics, sports, or something else?
+* What characteristics are captured by the data? For example, if your data is about cities, what characteristics of the cities are captured in the data? Population, crime rates, economic measures, business activity, traffic?
+* Assuming your data is rectangular (like a spreadsheet), how many rows and columns are in the dataset? If your data is not rectangular, how are you going to create a "tidy" dataset from these data?
+
+
+## Ideas about the figures that you will create to visualize this data:
+
+*Please provide ideas for the figures you are going to generate from these data. Are you going to make line plots, bar charts, density plot, dumbbell charts, choropleths, or what? You should provide a description of at least three figures. Your final project will include eight figures.*
+
+Please see the [R graph gallery](https://r-graph-gallery.com/) : 
+
+* Bubble map : *a map with markers displayed on top of it*. This map will be used to visualize the positions of the different battles as well as the number of casualties (size of the dot). This plots will be displayed in differents tabs for the different fronts of the war, as well as in one big map of the world. Each tab will also include an input sidebar to choose the year(s) for which the app should display the battles, as well as a way to see the progression accros time.
+
+* Connection map: the dataset includes the notion of "parents battle". This plots should allow to see which battles are the consequence of which ones.
+
+Each of this two type of map will be repeated for several fronts, probably more than three.
