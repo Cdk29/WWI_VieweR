@@ -1,0 +1,336 @@
+---
+title: "Data Review"
+author: "Etienne Rolland"
+date: "11/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+#####Make sure you load any required packages.
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+```
+
+## Import Your Data
+
+*In the following code hunk, import your data.*
+
+**Update :** one problem appear with the CDB90 Battle Dataset I originally choose to use. I needed to do additionnal scrapping, using the url in the battles.csv, to query additionnal data (latitude, longitude, etc). Sadly, the dataset is slightly old, and the links towards the resources of dbpedia were not the same as before. Hence, the query via SPARQL were not valid. Finally, I will just create the dataset using queries to the website.
+
+I am loading the battles.csv, just to got the name of the fronts, to be sure to not forget something in the subsequent queries.
+
+
+```{r data_import, warning=FALSE}
+
+#### Use read_csv() or another function
+
+#### Make sure your data is converted into a tibble. 
+
+#### For demonstration purposes, this example uses the mtcars data.
+
+library(readr)
+battles <- read_csv("battles.csv")
+battles <- battles[grep(battles$cow_warname, pattern="World War I of 1914-1918"),]
+```
+
+```{r}
+unique(battles$war)
+```
+## Scrapping
+
+### Testing queries
+
+If you are wondering what the hell is SPARQL, it is [here](https://www.r-bloggers.com/2013/01/sparql-with-r-in-less-than-5-minutes/).
+
+```{r}
+library(SPARQL)
+```
+
+```{r}
+endpoint <- "https://dbpedia.org/sparql/"
+
+query <-
+'select ?lat ?long ?causalties year(?date) as ?date ?name ?campaign ?desc where { 
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:causalties ?causalties .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:date ?date .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:name ?name .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:isPartOfMilitaryConflict ?campaign .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:abstract ?desc .
+  FILTER (langMatches(lang(?desc),"en"))
+}'
+
+query <- str_replace_all(query, "http://dbpedia.org/resource/Battle_of_Lorraine", "http://dbpedia.org/resource/Battle_of_Magdhaba")
+qd <- SPARQL(endpoint,query)
+df <- qd$results
+df
+```
+```{r}
+cleaning_and_concatenate_result <- function(df) {
+  
+df_concatenated <- df[1,]
+
+for (column in colnames(df)) {
+  content <- df[column]
+  content <- unique(content)
+  content <- paste(content, sep = ", ")
+  
+  content <- str_replace_all(string=content, pattern = "c\\(", replacement = "")
+  content <- str_replace_all(string=content, pattern = '\\"', replacement = "")
+  content <- str_replace_all(string=content, pattern = '\\)$', replacement = "")
+  content <- str_replace_all(string=content, pattern = '@en', replacement = "")
+  df_concatenated[column] <- content
+}
+return(df_concatenated)
+}
+
+```
+
+
+### Scrapping for real
+
+```{r}
+got_data_dbpedia <- function(url) {
+  
+ endpoint <- "https://dbpedia.org/sparql/"
+
+  query <-
+'select ?lat ?long ?causalties year(?date) as ?date ?name ?desc where { 
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:causalties ?causalties .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:date ?date .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:name ?name .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:abstract ?desc .
+  FILTER (langMatches(lang(?desc),"en"))
+}'
+
+  query <- str_replace_all(query, "http://dbpedia.org/resource/Battle_of_Lorraine", url)
+  qd <- SPARQL(endpoint,query)
+  df <- qd$results
+  df <- cleaning_and_concatenate_result(df)
+  return(df)
+}
+
+```
+
+```{r}
+url <- "http://dbpedia.org/resource/Battle_of_Magdhaba"
+```
+
+
+```{r}
+got_data_dbpedia(url)
+```
+
+### Politely 
+
+See : [the polite package](https://dmi3kno.github.io/polite/index.html).
+
+```{r}
+library(polite)
+got_data_dbpedia <- politely(got_data_dbpedia, verbose=TRUE) 
+
+```
+
+
+```{r}
+url <- "http://dbpedia.org/resource/Battle_of_Liege"
+got_data_dbpedia(url)
+```
+
+Edit while coding : the recursion add up for 100 battles.
+See the Recursion entry below.
+
+```{r}
+got_battles_for_front <- function(url) {
+
+endpoint <- "https://dbpedia.org/sparql/"
+
+query <-
+'select ?battle where { 
+  ?battle dbo:isPartOfMilitaryConflict <balise_to_change>
+}'
+
+query <- str_replace_all(query, "balise_to_change", url)
+qd <- SPARQL(endpoint,query)
+df <- qd$results
+vector_battles <- as.vector(unlist(df))
+vector_battles <- iconv(vector_battles, from="UTF-8", to="LATIN1")
+vector_battles <- str_replace_all(vector_battles, "<|>", "")
+
+# recursion ?
+for (url in vector_battles) {
+  vector_battles <- c(vector_battles, try(got_battles_for_front(url)))
+}
+
+
+return(vector_battles[grepl(vector_battles, pattern="http")])
+
+}
+
+got_battles_for_front <- politely(got_battles_for_front, verbose=TRUE) 
+```
+
+```{r message=FALSE, warning=FALSE}
+vector_battles <- got_battles_for_front("http://dbpedia.org/resource/Western_Front_(World_War_I)")
+length(vector_battles)
+```
+
+```{r message=FALSE, warning=FALSE}
+length(unique(vector_battles))
+
+```
+
+```{r}
+vector_battles <- head(vector_battles)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# Liège bug et retourne une dataframe vide mais parcequ'elle a pas lon et lat.
+
+list_battles_df<-list()
+i <- 0
+for (battles in vector_battles) {
+  i <- i + 1
+  list_battles_df[[i]] <- try(got_data_dbpedia(battles))
+}
+
+```
+
+```{r}
+list_battles_df <- list_battles_df[sapply(list_battles_df, class) == "data.frame"]
+```
+
+```{r}
+list_battles_df <- do.call(rbind, list_battles_df)
+# list_battles_df # works
+```
+
+```{r}
+create_front_battle_df <- function(url_front) {
+  
+    vector_battles <- got_battles_for_front(url_front)
+
+    #vector_battles <- head(vector_battles)
+    
+
+    list_battles_df<-list()
+    i <- 0
+    for (battles in vector_battles) {
+      i <- i + 1
+      list_battles_df[[i]] <- try(got_data_dbpedia(battles))
+    }
+    
+    list_battles_df <- list_battles_df[sapply(list_battles_df, class) == "data.frame"]
+    list_battles_df <- do.call(rbind, list_battles_df)
+    
+    return(list_battles_df)
+
+}
+
+```
+
+### Recursion
+
+Some front are nested inside battles, see for example :
+
+Gallipoli_campaign is queried from inside https://dbpedia.org/page/Middle_Eastern_theatre_of_World_War_I.
+
+Edit : after some refactoring, the recursion must go inside got_battles_for_front
+
+```{r message=FALSE, warning=FALSE}
+head(got_data_dbpedia("http://dbpedia.org/resource/Gallipoli_campaign"))
+```
+
+```{r message=FALSE, warning=FALSE}
+got_battles_for_front("http://dbpedia.org/resource/Gallipoli_campaign")
+```
+
+
+## Part 1
+
+*Using words, describe the visualization you are going to make using which variables/characteristics in your data*:
+
+*Western front tab*: For my first figure, I am going to create a bubble map that plots battles of the first war, on the western front map. A sidebar will allow to choose the year, and the markers of each battle will be clickable and display informations (descriptions, causalties, etc.) The data required are contained on the dbpedia page western front. Colors of the battle/bubble will be made based on the campaign color.
+
+
+```{r message=FALSE, warning=FALSE}
+western_front <- create_front_battle_df("http://dbpedia.org/resource/Western_Front_(World_War_I)")
+dim(western_front)
+head(western_front, 3)
+write.csv(western_front,file='western_front.csv', row.names=FALSE)
+
+```
+
+
+## Part 2
+
+*Eastern front tab*: For my second figure, I am going to create a bubble map that plots battles of the first war, on the eastern front map. A sidebar will allow to choose the year, and the markers of each battle will be clickable and display informations (descriptions, causalties, etc.) The data required are contained on the dbpedia page western front. Colors of the battle/bubble will be made based on the campaign color.
+
+Some additionnal data cleaning is required on the fly.
+```{r message=FALSE, warning=FALSE}
+Middle_Eastern_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I")
+dim(Middle_Eastern_theatre_of_World_War_I)
+head(Middle_Eastern_theatre_of_World_War_I, 3)
+write.csv(Middle_Eastern_theatre_of_World_War_I,file='Middle_Eastern_theatre_of_World_War_I.csv', row.names=FALSE)
+
+```
+
+
+## Part 3, 4, 5 and more
+
+
+*World map tab*: For my second figure, I am going to create a bubble map that plots battles of the first war, on the world front map. A sidebar will allow to choose the year, and the markers of each battle will be clickable and display informations (descriptions, causalties, etc.) The data required are contained on the dbpedia page western front. Colors of the battle/bubble will be made based on the campaign color. 
+
+This also include an African map tab and a European tab map.
+
+### Africa
+
+```{r message=FALSE, warning=FALSE}
+#Africa, from https://dbpedia.org/page/African_theatre_of_World_War_I
+
+African_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/African_theatre_of_World_War_I")
+dim(African_theatre_of_World_War_I)
+head(African_theatre_of_World_War_I, 3)
+write.csv(African_theatre_of_World_War_I,file='African_theatre_of_World_War_I.csv', row.names=FALSE)
+```
+
+
+### Europa
+
+```{r message=FALSE, warning=FALSE}
+
+European_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/European_theatre_of_World_War_I")
+dim(European_theatre_of_World_War_I)
+head(European_theatre_of_World_War_I, 3)
+write.csv(European_theatre_of_World_War_I,file='European_theatre_of_World_War_I.csv', row.names=FALSE)
+
+
+```
+
+### Asia
+
+```{r message=FALSE, warning=FALSE}
+
+Asian_and_Pacific_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I")
+dim(Asian_and_Pacific_theatre_of_World_War_I)
+head(Asian_and_Pacific_theatre_of_World_War_I, 3)
+write.csv(Asian_and_Pacific_theatre_of_World_War_I,file='Asian_and_Pacific_theatre_of_World_War_I.csv', row.names=FALSE)
+
+
+```
+
+### All world
+
+```{r data_3}
+all_battles <- rbind(western_front, Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
+head(all_battles, 3)
+write.csv(df,file='all_battles_WWI.csv', row.names=FALSE)
+
+```
