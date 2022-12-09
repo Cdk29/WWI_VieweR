@@ -75,6 +75,10 @@ cleaning_and_concatenate_result <- function(df) {
 df_concatenated <- df[1,]
 
 for (column in colnames(df)) {
+  if (column == "depiction") { # une seule image
+    df_concatenated[column] <- df[1,]$depiction
+    next
+  }
   content <- df[column]
   content <- unique(content)
   content <- paste(content, sep = ", ")
@@ -90,6 +94,12 @@ return(df_concatenated)
 
 ```
 
+```{r}
+library(digest)
+# https://stackoverflow.com/questions/33689980/get-thumbnail-image-from-wikimedia-commons
+digest("Camel_corps_at_Magdhaba.jpg", algo="md5", serialize=F)
+```
+
 
 ### Scrapping for real
 
@@ -99,10 +109,13 @@ got_data_dbpedia <- function(url) {
  endpoint <- "https://dbpedia.org/sparql/"
 
   query <-
-'select ?lat ?long ?causalties year(?date) as ?date ?name ?desc where { 
+'select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?date ?name ?desc where { 
   <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
   <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:strength ?strength .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:causalties ?causalties .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:isPartOfMilitaryConflict	?campaign .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:depiction	?depiction .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:date ?date .
   <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:name ?name .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:abstract ?desc .
@@ -245,11 +258,11 @@ Gallipoli_campaign is queried from inside https://dbpedia.org/page/Middle_Easter
 Edit : after some refactoring, the recursion must go inside got_battles_for_front
 
 ```{r message=FALSE, warning=FALSE}
-head(got_data_dbpedia("http://dbpedia.org/resource/Gallipoli_campaign"))
+#head(got_data_dbpedia("http://dbpedia.org/resource/Gallipoli_campaign"))
 ```
 
 ```{r message=FALSE, warning=FALSE}
-got_battles_for_front("http://dbpedia.org/resource/Gallipoli_campaign")
+#got_battles_for_front("http://dbpedia.org/resource/Gallipoli_campaign")
 ```
 
 
@@ -261,10 +274,10 @@ got_battles_for_front("http://dbpedia.org/resource/Gallipoli_campaign")
 
 
 ```{r message=FALSE, warning=FALSE}
-western_front <- create_front_battle_df("http://dbpedia.org/resource/Western_Front_(World_War_I)")
-dim(western_front)
-head(western_front, 3)
-write.csv(western_front,file='western_front.csv', row.names=FALSE)
+# western_front <- create_front_battle_df("http://dbpedia.org/resource/Western_Front_(World_War_I)")
+# dim(western_front)
+# head(western_front, 3)
+# write.csv(western_front,file='western_front.csv', row.names=FALSE)
 
 ```
 
@@ -275,10 +288,10 @@ write.csv(western_front,file='western_front.csv', row.names=FALSE)
 
 Some additionnal data cleaning is required on the fly.
 ```{r message=FALSE, warning=FALSE}
-Middle_Eastern_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I")
-dim(Middle_Eastern_theatre_of_World_War_I)
-head(Middle_Eastern_theatre_of_World_War_I, 3)
-write.csv(Middle_Eastern_theatre_of_World_War_I,file='Middle_Eastern_theatre_of_World_War_I.csv', row.names=FALSE)
+# Middle_Eastern_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I")
+# dim(Middle_Eastern_theatre_of_World_War_I)
+# head(Middle_Eastern_theatre_of_World_War_I, 3)
+# write.csv(Middle_Eastern_theatre_of_World_War_I,file='Middle_Eastern_theatre_of_World_War_I.csv', row.names=FALSE)
 
 ```
 
@@ -295,10 +308,10 @@ This also include an African map tab and a European tab map.
 ```{r message=FALSE, warning=FALSE}
 #Africa, from https://dbpedia.org/page/African_theatre_of_World_War_I
 
-African_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/African_theatre_of_World_War_I")
-dim(African_theatre_of_World_War_I)
-head(African_theatre_of_World_War_I, 3)
-write.csv(African_theatre_of_World_War_I,file='African_theatre_of_World_War_I.csv', row.names=FALSE)
+# African_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/African_theatre_of_World_War_I")
+# dim(African_theatre_of_World_War_I)
+# head(African_theatre_of_World_War_I, 3)
+# write.csv(African_theatre_of_World_War_I,file='African_theatre_of_World_War_I.csv', row.names=FALSE)
 ```
 
 
@@ -308,7 +321,7 @@ write.csv(African_theatre_of_World_War_I,file='African_theatre_of_World_War_I.cs
 
 European_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/European_theatre_of_World_War_I")
 dim(European_theatre_of_World_War_I)
-head(European_theatre_of_World_War_I, 3)
+head(European_theatre_of_World_War_I[1:8], 3)
 write.csv(European_theatre_of_World_War_I,file='European_theatre_of_World_War_I.csv', row.names=FALSE)
 
 
@@ -318,10 +331,10 @@ write.csv(European_theatre_of_World_War_I,file='European_theatre_of_World_War_I.
 
 ```{r message=FALSE, warning=FALSE}
 
-Asian_and_Pacific_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I")
-dim(Asian_and_Pacific_theatre_of_World_War_I)
-head(Asian_and_Pacific_theatre_of_World_War_I, 3)
-write.csv(Asian_and_Pacific_theatre_of_World_War_I,file='Asian_and_Pacific_theatre_of_World_War_I.csv', row.names=FALSE)
+# Asian_and_Pacific_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I")
+# dim(Asian_and_Pacific_theatre_of_World_War_I)
+# head(Asian_and_Pacific_theatre_of_World_War_I, 3)
+# write.csv(Asian_and_Pacific_theatre_of_World_War_I,file='Asian_and_Pacific_theatre_of_World_War_I.csv', row.names=FALSE)
 
 
 ```
@@ -329,8 +342,8 @@ write.csv(Asian_and_Pacific_theatre_of_World_War_I,file='Asian_and_Pacific_theat
 ### All world
 
 ```{r data_3}
-all_battles <- rbind(western_front, Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
-head(all_battles, 3)
-write.csv(df,file='all_battles_WWI.csv', row.names=FALSE)
+# all_battles <- rbind(western_front, Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
+# head(all_battles, 3)
+# write.csv(df,file='all_battles_WWI.csv', row.names=FALSE)
 
 ```
