@@ -11,7 +11,6 @@ output: html_document
 
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
-
 ```
 
 ## Import Your Data
@@ -30,6 +29,7 @@ I am loading the battles.csv, just to got the name of the fronts, to be sure to 
 #### Make sure your data is converted into a tibble. 
 
 #### For demonstration purposes, this example uses the mtcars data.
+library(utils)
 
 library(readr)
 battles <- read_csv("battles.csv")
@@ -100,6 +100,33 @@ library(digest)
 digest("Camel_corps_at_Magdhaba.jpg", algo="md5", serialize=F)
 ```
 
+```{r}
+clean_url_image <- function(depiction) {
+  # the image inside dbpedia is a relative/redirection path inside wiki commons
+  # we need the exact url for printing inside a shiny app
+
+  #depiction <- "<http://commons.wikimedia.org/wiki/Special:FilePath/Camel_corps_at_Magdhaba.jpg>"
+  depiction  <- str_replace_all(depiction ,"<|>", "")
+  img_name <- unlist(str_split(depiction, "/"))
+  img_name <- tail(img_name, n=1) #last one
+  
+  hash <- digest(img_name, algo="md5", serialize=F)
+  # hash
+  # new column for the popup label
+  depiction <- paste0("https://upload.wikimedia.org/wikipedia/commons/", 
+                      substr(hash, 1, 1), # first character
+                      "/",
+                      substr(hash, 1, 2),
+                      "/",
+                      URLencode(img_name))
+  return(depiction)
+}
+```
+
+```{r}
+clean_url_image("<http://commons.wikimedia.org/wiki/Special:FilePath/Camel_corps_at_Magdhaba.jpg>")
+```
+
 
 ### Scrapping for real
 
@@ -126,6 +153,12 @@ got_data_dbpedia <- function(url) {
   qd <- SPARQL(endpoint,query)
   df <- qd$results
   df <- cleaning_and_concatenate_result(df)
+  df$depiction <- clean_url_image(df$depiction)
+  df$desc <- str_replace_all(df$desc, "â€“", "-")
+  df$name <- iconv(df$name , from="UTF-8", to="LATIN1")
+  df$desc <- iconv(df$desc , from="UTF-8", to="LATIN1")
+  df$campaign <- str_replace_all(df$campaign , "<|>", "")
+  df$campaign <- str_replace_all(df$campaign , "http://dbpedia.org/resource/", "")
   return(df)
 }
 
@@ -152,7 +185,7 @@ got_data_dbpedia <- politely(got_data_dbpedia, verbose=TRUE)
 
 
 ```{r}
-url <- "http://dbpedia.org/resource/Battle_of_Liege"
+# url <- "http://dbpedia.org/resource/Battle_of_Lorraine"
 got_data_dbpedia(url)
 ```
 
