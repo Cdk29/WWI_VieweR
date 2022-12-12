@@ -186,6 +186,7 @@ pre code {
 #### Make sure your data is converted into a tibble. 
 
 #### For demonstration purposes, this example uses the mtcars data.
+library(utils)
 
 library(readr)
 battles &lt;- read_csv(&quot;battles.csv&quot;)</code></pre>
@@ -249,6 +250,10 @@ df</code></pre>
 df_concatenated &lt;- df[1,]
 
 for (column in colnames(df)) {
+  if (column == &quot;depiction&quot;) { # une seule image
+    df_concatenated[column] &lt;- df[1,]$depiction
+    next
+  }
   content &lt;- df[column]
   content &lt;- unique(content)
   content &lt;- paste(content, sep = &quot;, &quot;)
@@ -261,6 +266,32 @@ for (column in colnames(df)) {
 }
 return(df_concatenated)
 }</code></pre>
+<pre class="r"><code>library(digest)
+# https://stackoverflow.com/questions/33689980/get-thumbnail-image-from-wikimedia-commons
+digest(&quot;Camel_corps_at_Magdhaba.jpg&quot;, algo=&quot;md5&quot;, serialize=F)</code></pre>
+<pre><code>## [1] &quot;dd354ae5dd6dfbf5c01c706606b03a0c&quot;</code></pre>
+<pre class="r"><code>clean_url_image &lt;- function(depiction) {
+  # the image inside dbpedia is a relative/redirection path inside wiki commons
+  # we need the exact url for printing inside a shiny app
+
+  #depiction &lt;- &quot;&lt;http://commons.wikimedia.org/wiki/Special:FilePath/Camel_corps_at_Magdhaba.jpg&gt;&quot;
+  depiction  &lt;- str_replace_all(depiction ,&quot;&lt;|&gt;&quot;, &quot;&quot;)
+  img_name &lt;- unlist(str_split(depiction, &quot;/&quot;))
+  img_name &lt;- tail(img_name, n=1) #last one
+  
+  hash &lt;- digest(img_name, algo=&quot;md5&quot;, serialize=F)
+  # hash
+  # new column for the popup label
+  depiction &lt;- paste0(&quot;https://upload.wikimedia.org/wikipedia/commons/&quot;, 
+                      substr(hash, 1, 1), # first character
+                      &quot;/&quot;,
+                      substr(hash, 1, 2),
+                      &quot;/&quot;,
+                      URLencode(img_name))
+  return(depiction)
+}</code></pre>
+<pre class="r"><code>clean_url_image(&quot;&lt;http://commons.wikimedia.org/wiki/Special:FilePath/Camel_corps_at_Magdhaba.jpg&gt;&quot;)</code></pre>
+<pre><code>## [1] &quot;https://upload.wikimedia.org/wikipedia/commons/d/dd/Camel_corps_at_Magdhaba.jpg&quot;</code></pre>
 </div>
 <div id="scrapping-for-real" class="section level3">
 <h3>Scrapping for real</h3>
@@ -269,10 +300,13 @@ return(df_concatenated)
  endpoint &lt;- &quot;https://dbpedia.org/sparql/&quot;
 
   query &lt;-
-&#39;select ?lat ?long ?causalties year(?date) as ?date ?name ?desc where { 
+&#39;select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?date ?name ?desc where { 
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; geo:lat ?lat .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; geo:long ?long .
+  &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:strength ?strength .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:causalties ?causalties .
+  &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:isPartOfMilitaryConflict ?campaign .
+  &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; foaf:depiction   ?depiction .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:date ?date .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; foaf:name ?name .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:abstract ?desc .
@@ -283,21 +317,33 @@ return(df_concatenated)
   qd &lt;- SPARQL(endpoint,query)
   df &lt;- qd$results
   df &lt;- cleaning_and_concatenate_result(df)
+  df$depiction &lt;- clean_url_image(df$depiction)
+  df$desc &lt;- str_replace_all(df$desc, &quot;â€“&quot;, &quot;-&quot;)
+  df$name &lt;- iconv(df$name , from=&quot;UTF-8&quot;, to=&quot;LATIN1&quot;)
+  df$desc &lt;- iconv(df$desc , from=&quot;UTF-8&quot;, to=&quot;LATIN1&quot;)
+  df$campaign &lt;- str_replace_all(df$campaign , &quot;&lt;|&gt;&quot;, &quot;&quot;)
+  df$campaign &lt;- str_replace_all(df$campaign , &quot;http://dbpedia.org/resource/&quot;, &quot;&quot;)
   return(df)
 }</code></pre>
 <pre class="r"><code>url &lt;- &quot;http://dbpedia.org/resource/Battle_of_Magdhaba&quot;</code></pre>
 <pre class="r"><code>got_data_dbpedia(url)</code></pre>
-<pre><code>##     lat  long           causalties date               name
-## 1 30.89 34.02 22 dead, 124 wounded 1916 Battle of Magdhaba
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  desc
-## 1 The Battle of Magdhaba took place on 23 December 1916 during the Defence of Egypt section of the Sinai and Palestine Campaign in the First World War. The attack by the Anzac Mounted Division took place against an entrenched Ottoman Army garrison to the south and east of Bir Lahfan in the Sinai desert, some 18â€“25 miles (29â€“40 km) inland from the Mediterranean coast. This Egyptian Expeditionary Force (EEF) victory against the Ottoman Empire garrison also secured the town of El Arish after the Ottoman garrison withdrew. In August 1916, a combined Ottoman and German Empire army had been forced to retreat to Bir el Abd, after the British victory in the Battle of Romani. During the following three months the defeated force retired further eastwards to El Arish, while the captured territory stretching from the Suez Canal was consolidated and garrisoned by the EEF. Patrols and reconnaissances were carried out by British forces, to protect the continuing construction of the railway and water pipeline and to deny passage across the Sinai desert to the Ottoman forces by destroying water cisterns and wells. By December 1916, construction of the infrastructure and supply lines had sufficiently progressed to enable the British advance to recommence, during the evening of 20 December. By the following morning a mounted force had reached El Arish to find it abandoned. An Ottoman Army garrison in a strong defensive position was located at Magdhaba, some 18â€“30 miles (29â€“48 km) inland to the south east, on the Wadi el Arish. After a second night march by the Anzac Mounted Division (Australian and New Zealand Mounted Division), the attack on Magdhaba was launched by Australian, British and New Zealand troops against well-entrenched Ottoman forces defending a series of six redoubts. During the day&#39;s fierce fighting, the mounted infantry tactics of riding as close to the front line as possible and then dismounting to make their attack with the bayonet supported by artillery and machine guns prevailed, assisted by aircraft reconnaissances. All of the well-camouflaged redoubts were eventually located and captured and the Ottoman defenders surrendered in the late afternoon.</code></pre>
+<pre><code>##     lat  long     strength           causalties
+## 1 30.89 34.02 6,000, 2,000 124 wounded, 22 dead
+##                                campaign
+## 1 Middle_Eastern_theatre_of_World_War_I
+##                                                                         depiction
+## 1 https://upload.wikimedia.org/wikipedia/commons/d/dd/Camel_corps_at_Magdhaba.jpg
+##   date               name
+## 1 1916 Battle of Magdhaba
+##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          desc
+## 1 The Battle of Magdhaba took place on 23 December 1916 during the Defence of Egypt section of the Sinai and Palestine Campaign in the First World War. The attack by the Anzac Mounted Division took place against an entrenched Ottoman Army garrison to the south and east of Bir Lahfan in the Sinai desert, some 18-25 miles (29-40 km) inland from the Mediterranean coast. This Egyptian Expeditionary Force (EEF) victory against the Ottoman Empire garrison also secured the town of El Arish after the Ottoman garrison withdrew. In August 1916, a combined Ottoman and German Empire army had been forced to retreat to Bir el Abd, after the British victory in the Battle of Romani. During the following three months the defeated force retired further eastwards to El Arish, while the captured territory stretching from the Suez Canal was consolidated and garrisoned by the EEF. Patrols and reconnaissances were carried out by British forces, to protect the continuing construction of the railway and water pipeline and to deny passage across the Sinai desert to the Ottoman forces by destroying water cisterns and wells. By December 1916, construction of the infrastructure and supply lines had sufficiently progressed to enable the British advance to recommence, during the evening of 20 December. By the following morning a mounted force had reached El Arish to find it abandoned. An Ottoman Army garrison in a strong defensive position was located at Magdhaba, some 18-30 miles (29-48 km) inland to the south east, on the Wadi el Arish. After a second night march by the Anzac Mounted Division (Australian and New Zealand Mounted Division), the attack on Magdhaba was launched by Australian, British and New Zealand troops against well-entrenched Ottoman forces defending a series of six redoubts. During the day&#39;s fierce fighting, the mounted infantry tactics of riding as close to the front line as possible and then dismounting to make their attack with the bayonet supported by artillery and machine guns prevailed, assisted by aircraft reconnaissances. All of the well-camouflaged redoubts were eventually located and captured and the Ottoman defenders surrendered in the late afternoon.</code></pre>
 </div>
 <div id="politely" class="section level3">
 <h3>Politely</h3>
 <p>See : <a href="https://dmi3kno.github.io/polite/index.html">the polite package</a>.</p>
 <pre class="r"><code>library(polite)
 got_data_dbpedia &lt;- politely(got_data_dbpedia, verbose=TRUE) </code></pre>
-<pre class="r"><code>url &lt;- &quot;http://dbpedia.org/resource/Battle_of_Liege&quot;
+<pre class="r"><code># url &lt;- &quot;http://dbpedia.org/resource/Battle_of_Lorraine&quot;
 got_data_dbpedia(url)</code></pre>
 <pre><code>## Fetching robots.txt</code></pre>
 <pre><code>## rt_robotstxt_http_getter: normal http get</code></pre>
@@ -306,9 +352,18 @@ got_data_dbpedia(url)</code></pre>
 <pre><code>## Total of 0 crawl delay rule(s) defined for this host.</code></pre>
 <pre><code>## Your rate will be set to 1 request every 5 second(s).</code></pre>
 <pre><code>## Pausing...</code></pre>
-<pre><code>## Scraping: http://dbpedia.org/resource/Battle_of_Liege</code></pre>
+<pre><code>## Scraping: http://dbpedia.org/resource/Battle_of_Magdhaba</code></pre>
 <pre><code>## Setting useragent: polite R (3.6.3 x86_64-pc-linux-gnu x86_64 linux-gnu) bot</code></pre>
-<pre><code>## data frame with 0 columns and 1 row</code></pre>
+<pre><code>##     lat  long     strength           causalties
+## 1 30.89 34.02 6,000, 2,000 124 wounded, 22 dead
+##                                campaign
+## 1 Middle_Eastern_theatre_of_World_War_I
+##                                                                         depiction
+## 1 https://upload.wikimedia.org/wikipedia/commons/d/dd/Camel_corps_at_Magdhaba.jpg
+##   date               name
+## 1 1916 Battle of Magdhaba
+##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          desc
+## 1 The Battle of Magdhaba took place on 23 December 1916 during the Defence of Egypt section of the Sinai and Palestine Campaign in the First World War. The attack by the Anzac Mounted Division took place against an entrenched Ottoman Army garrison to the south and east of Bir Lahfan in the Sinai desert, some 18-25 miles (29-40 km) inland from the Mediterranean coast. This Egyptian Expeditionary Force (EEF) victory against the Ottoman Empire garrison also secured the town of El Arish after the Ottoman garrison withdrew. In August 1916, a combined Ottoman and German Empire army had been forced to retreat to Bir el Abd, after the British victory in the Battle of Romani. During the following three months the defeated force retired further eastwards to El Arish, while the captured territory stretching from the Suez Canal was consolidated and garrisoned by the EEF. Patrols and reconnaissances were carried out by British forces, to protect the continuing construction of the railway and water pipeline and to deny passage across the Sinai desert to the Ottoman forces by destroying water cisterns and wells. By December 1916, construction of the infrastructure and supply lines had sufficiently progressed to enable the British advance to recommence, during the evening of 20 December. By the following morning a mounted force had reached El Arish to find it abandoned. An Ottoman Army garrison in a strong defensive position was located at Magdhaba, some 18-30 miles (29-48 km) inland to the south east, on the Wadi el Arish. After a second night march by the Anzac Mounted Division (Australian and New Zealand Mounted Division), the attack on Magdhaba was launched by Australian, British and New Zealand troops against well-entrenched Ottoman forces defending a series of six redoubts. During the day&#39;s fierce fighting, the mounted infantry tactics of riding as close to the front line as possible and then dismounting to make their attack with the bayonet supported by artillery and machine guns prevailed, assisted by aircraft reconnaissances. All of the well-camouflaged redoubts were eventually located and captured and the Ottoman defenders surrendered in the late afternoon.</code></pre>
 <p>Edit while coding : the recursion add up for 100 battles. See the Recursion entry below.</p>
 <pre class="r"><code>got_battles_for_front &lt;- function(url) {
 
@@ -362,7 +417,44 @@ for (battles in vector_battles) {
   list_battles_df[[i]] &lt;- try(got_data_dbpedia(battles))
 }</code></pre>
 <pre><code>## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name</code></pre>
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE</code></pre>
 <pre class="r"><code>list_battles_df &lt;- list_battles_df[sapply(list_battles_df, class) == &quot;data.frame&quot;]</code></pre>
 <pre class="r"><code>list_battles_df &lt;- do.call(rbind, list_battles_df)
 # list_battles_df # works</code></pre>
@@ -392,358 +484,27 @@ for (battles in vector_battles) {
 <p>Some front are nested inside battles, see for example :</p>
 <p>Gallipoli_campaign is queried from inside <a href="https://dbpedia.org/page/Middle_Eastern_theatre_of_World_War_I" class="uri">https://dbpedia.org/page/Middle_Eastern_theatre_of_World_War_I</a>.</p>
 <p>Edit : after some refactoring, the recursion must go inside got_battles_for_front</p>
-<pre class="r"><code>head(got_data_dbpedia(&quot;http://dbpedia.org/resource/Gallipoli_campaign&quot;))</code></pre>
-<pre><code>##       lat  long
-## 1 40.3667 26.45
-##                                                                                                                                                                                                                                                                                                   causalties
-## 1 9,000 killed &amp; missing, 78,494 evacuated sick), 18,500 wounded, 18,000 wounded, British Empire:, 20,000 evacuated sick, 4,140 wounded, Total: 300,000 (56,707 killed), France:, ----, Australia:, New Zealand:, 3,431 killed, 7,594 killed, 78,749 wounded, 9,708 missing and POW, 198,340, (31,389 killed
-##        date               name
-## 1 1915:1916 Gallipoli campaign
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               desc
-## 1 The Gallipoli campaign was a military campaign in the First World War that took place on the Gallipoli peninsula (Gelibolu in modern Turkey), from 17 February 1915 to 9 January 1916. The Entente powers, Britain, France and Russia, sought to weaken the Ottoman Empire, one of the Central Powers, by taking control of the Ottoman straits. This would expose the Ottoman capital at Constantinople to bombardment by Allied battleships and cut it off from the Asian part of the empire. With Turkey defeated, the Suez Canal would be safe and a year-round Allied supply route could be opened through the Black Sea to warm-water ports in Russia. The attempt by the Allied fleet to force a passage through the Dardanelles in February 1915 failed and was followed by an amphibious landing on the Gallipoli peninsula in April 1915. In January 1916, after eight months&#39; fighting, with approximately 250,000 casualties on each side, the land campaign was abandoned and the invasion force withdrawn. It was a costly campaign for the Entente powers and the Ottoman Empire as well as for the sponsors of the expedition, especially the First Lord of the Admiralty (1911â€“1915), Winston Churchill. The campaign was considered a great Ottoman victory. In Turkey, it is regarded as a defining moment in the history of the state, a final surge in the defence of the motherland as the Ottoman Empire retreated. The struggle formed the basis for the Turkish War of Independence and the declaration of the Republic of Turkey eight years later, with Mustafa Kemal AtatÃ¼rk, who rose to prominence as a commander at Gallipoli, as founder and president. The campaign is often considered to be the beginning of Australian and New Zealand national consciousness; 25 April, the anniversary of the landings, is known as Anzac Day, the most significant commemoration of military casualties and veterans in the two countries, surpassing Remembrance Day (Armistice Day).</code></pre>
-<pre class="r"><code>got_battles_for_front(&quot;http://dbpedia.org/resource/Gallipoli_campaign&quot;)</code></pre>
-<pre><code>##  [1] &quot;http://dbpedia.org/resource/Battle_of_Kumkale&quot;                           
-##  [2] &quot;http://dbpedia.org/resource/Battle_of_Lone_Pine&quot;                         
-##  [3] &quot;http://dbpedia.org/resource/Battle_of_Sari_Bair&quot;                         
-##  [4] &quot;http://dbpedia.org/resource/Battle_of_the_Nek&quot;                           
-##  [5] &quot;http://dbpedia.org/resource/Battle_for_Baby_700&quot;                         
-##  [6] &quot;http://dbpedia.org/resource/Battle_for_No.3_Post&quot;                        
-##  [7] &quot;http://dbpedia.org/resource/Battle_of_Chunuk_Bair&quot;                       
-##  [8] &quot;http://dbpedia.org/resource/Battle_of_Gully_Ravine&quot;                      
-##  [9] &quot;http://dbpedia.org/resource/Battle_of_Hill_60_(Gallipoli)&quot;               
-## [10] &quot;http://dbpedia.org/resource/Landing_at_Anzac_Cove&quot;                       
-## [11] &quot;http://dbpedia.org/resource/Landing_at_Cape_Helles&quot;                      
-## [12] &quot;http://dbpedia.org/resource/Landing_at_Suvla_Bay&quot;                        
-## [13] &quot;http://dbpedia.org/resource/Naval_operations_in_the_Dardanelles_campaign&quot;
-## [14] &quot;http://dbpedia.org/resource/Third_attack_on_Anzac_Cove&quot;</code></pre>
+<pre class="r"><code>#head(got_data_dbpedia(&quot;http://dbpedia.org/resource/Gallipoli_campaign&quot;))</code></pre>
+<pre class="r"><code>#got_battles_for_front(&quot;http://dbpedia.org/resource/Gallipoli_campaign&quot;)</code></pre>
 </div>
 </div>
 <div id="part-1" class="section level2">
 <h2>Part 1</h2>
 <p><em>Using words, describe the visualization you are going to make using which variables/characteristics in your data</em>:</p>
 <p><em>Western front tab</em>: For my first figure, I am going to create a bubble map that plots battles of the first war, on the western front map. A sidebar will allow to choose the year, and the markers of each battle will be clickable and display informations (descriptions, causalties, etc.) The data required are contained on the dbpedia page western front. Colors of the battle/bubble will be made based on the campaign color.</p>
-<pre class="r"><code>western_front &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/Western_Front_(World_War_I)&quot;)</code></pre>
-<pre><code>## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## StartTag: invalid element name
-## StartTag: invalid element name
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 3: StartTag: invalid element name
-## 4: StartTag: invalid element name
-## 5: StartTag: invalid element name
-## 6: StartTag: invalid element name</code></pre>
-<pre class="r"><code>dim(western_front)</code></pre>
-<pre><code>## [1] 117   6</code></pre>
-<pre class="r"><code>head(western_front, 3)</code></pre>
-<pre><code>##       lat    long                              causalties date
-## 1   50.89   2.922 Over 75% of Canadians killed or wounded 1915
-## 2 50.4583 2.79417                                  59,247 1915
-## 3 50.7625 2.89528                                  24,562 1917
-##                         name
-## 1 Battle of Kitcheners&#39; Wood
-## 2             Battle of Loos
-## 3         Battle of Messines
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      desc
-## 1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         The Battle of Kitcheners&#39; Wood was fought during World War I during the Second Battle of Ypres.
-## 2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     The Battle of Loos took place from 25 September to 8 October 1915 in France on the Western Front, during the First World War. It was the biggest British attack of 1915, the first time that the British used poison gas and the first mass engagement of New Army units. The French and British tried to break through the German defences in Artois and Champagne and restore a war of movement. Despite improved methods, more ammunition and better equipment, the Franco-British attacks were largely contained by the Germans, except for local losses of ground. The British gas attack failed to neutralize the defenders and the artillery bombardment was too short to destroy the barbed wire or machine gun nests. German tactical defensive proficiency was still dramatically superior to the British offensive planning and doctrine, resulting in a British defeat.
-## 3 The Battle of Messines (7â€“14 June 1917) was an attack by the British Second Army (General Sir Herbert Plumer), on the Western Front, near the village of Messines (now Mesen) in West Flanders, Belgium, during the First World War. The Nivelle Offensive in April and May had failed to achieve its more grandiose aims, had led to the demoralisation of French troops and confounded the Anglo-French strategy for 1917. The attack forced the Germans to move reserves to Flanders from the Arras and Aisne fronts, relieving pressure on the French. The British tactical objective was to capture the German defences on the ridge, which ran from Ploegsteert Wood (Plugstreet to the British) in the south, through Messines and Wytschaete to Mt Sorrel, depriving the German 4th Army of the high ground. The ridge gave commanding views of the British defences and back areas of Ypres to the north, from which the British intended to conduct the Northern Operation, an advance to Passchendaele Ridge and then the capture of the Belgian coast up to the Dutch frontier. The Second Army had five corps, three for the attack and two on the northern flank not part of the operation; XIV Corps was in General Headquarters reserve. The 4th Army divisions of Group Wytschaete (Gruppe Wijtschate, the IX Reserve Corps headquarters) held the ridge and were later reinforced by a division from Group Ypres (Gruppe Ypern). The British attacked with the II Anzac Corps (3rd Australian Division, New Zealand Division and the 25th Division, with the 4th Australian Division in reserve), IX Corps (36th (Ulster), 16th (Irish) and 19th (Western) divisions and the 11th (Northern) Division in reserve), X Corps (41st, 47th (1/2nd London) and 23rd Divisions with the 24th Division in reserve). XIV Corps in reserve (Guards, 1st, 8th and 32nd divisions). The 30th, 55th (West Lancashire), 39th and 38th (Welsh) divisions in II Corps and VIII Corps, guarded the northern flank and made probing attacks on 8 June. Gruppe Wijtschate held the ridge with the 204th, 35th, 2nd, 3rd Bavarian (relieving the 40th Division when the British attack began) and 4th Bavarian divisions, with the 7th Division and 1st Guard Reserve Division as Eingreif (counter-attack) divisions. The 24th Saxon Division, relieved on 5 June, was rushed back when the attack began and the 11th Division, in Gruppe Ypern reserve, arrived on 8 June. The battle began with the detonation of 19 mines beneath the German front position, which devastated it and left large craters. A creeping barrage, 700 yd (640 m) deep, began and protected the British troops as they secured the ridge with support from tanks, cavalry patrols and aircraft. The effect of the British mines, barrages and bombardments was improved by advances in artillery survey, flash spotting and centralised control of artillery from the Second Army headquarters. British attacks from 8 to 14 June advanced the front line beyond the former German Sehnenstellung (Chord Position, the Oosttaverne Line to the British). The battle was a prelude to the much larger Third Battle of Ypres, the preliminary bombardment for which began on 11 July 1917.</code></pre>
-<pre class="r"><code>write.csv(western_front,file=&#39;western_front.csv&#39;, row.names=FALSE)</code></pre>
+<pre class="r"><code># western_front &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/Western_Front_(World_War_I)&quot;)
+# dim(western_front)
+# head(western_front, 3)
+# write.csv(western_front,file=&#39;western_front.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 <div id="part-2" class="section level2">
 <h2>Part 2</h2>
 <p><em>Eastern front tab</em>: For my second figure, I am going to create a bubble map that plots battles of the first war, on the eastern front map. A sidebar will allow to choose the year, and the markers of each battle will be clickable and display informations (descriptions, causalties, etc.) The data required are contained on the dbpedia page western front. Colors of the battle/bubble will be made based on the campaign color.</p>
 <p>Some additionnal data cleaning is required on the fly.</p>
-<pre class="r"><code>Middle_Eastern_theatre_of_World_War_I &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I&quot;)</code></pre>
-<pre><code>## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : I can&#39;t find an argument containing url. Aborting.
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## Error : C stack usage  7971796 is too close to the limit
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name</code></pre>
-<pre class="r"><code>dim(Middle_Eastern_theatre_of_World_War_I)</code></pre>
-<pre><code>## [1] 1008    6</code></pre>
-<pre class="r"><code>head(Middle_Eastern_theatre_of_World_War_I, 3)</code></pre>
-<pre><code>##      lat   long                             causalties date               name
-## 1  30.89  34.02                   22 dead, 124 wounded 1916 Battle of Magdhaba
-## 2   32.4 34.883 4,179 wounded, 382 missing, 782 killed 1918  Battle of Megiddo
-## 3 31.265 34.235                415 wounded, 71 killed, 1917     Battle of Rafa
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  desc
-## 1                                                                                                                                                                                                                                                                                                                                                                                                                                                 The Battle of Magdhaba took place on 23 December 1916 during the Defence of Egypt section of the Sinai and Palestine Campaign in the First World War. The attack by the Anzac Mounted Division took place against an entrenched Ottoman Army garrison to the south and east of Bir Lahfan in the Sinai desert, some 18â€“25 miles (29â€“40 km) inland from the Mediterranean coast. This Egyptian Expeditionary Force (EEF) victory against the Ottoman Empire garrison also secured the town of El Arish after the Ottoman garrison withdrew. In August 1916, a combined Ottoman and German Empire army had been forced to retreat to Bir el Abd, after the British victory in the Battle of Romani. During the following three months the defeated force retired further eastwards to El Arish, while the captured territory stretching from the Suez Canal was consolidated and garrisoned by the EEF. Patrols and reconnaissances were carried out by British forces, to protect the continuing construction of the railway and water pipeline and to deny passage across the Sinai desert to the Ottoman forces by destroying water cisterns and wells. By December 1916, construction of the infrastructure and supply lines had sufficiently progressed to enable the British advance to recommence, during the evening of 20 December. By the following morning a mounted force had reached El Arish to find it abandoned. An Ottoman Army garrison in a strong defensive position was located at Magdhaba, some 18â€“30 miles (29â€“48 km) inland to the south east, on the Wadi el Arish. After a second night march by the Anzac Mounted Division (Australian and New Zealand Mounted Division), the attack on Magdhaba was launched by Australian, British and New Zealand troops against well-entrenched Ottoman forces defending a series of six redoubts. During the day&#39;s fierce fighting, the mounted infantry tactics of riding as close to the front line as possible and then dismounting to make their attack with the bayonet supported by artillery and machine guns prevailed, assisted by aircraft reconnaissances. All of the well-camouflaged redoubts were eventually located and captured and the Ottoman defenders surrendered in the late afternoon.
-## 2 The Battle of Megiddo (Turkish: Megiddo Muharebesi), also known in Turkish as the Nablus Hezimeti (Rout of Nablus) or the Nablus YarmasÄ± (Breakthrough at Nablus), was fought between 19 and 25 September 1918, on the Plain of Sharon, in front of Tulkarm, Tabsor and Arara in the Judean Hills as well as on the Esdralon Plain at Nazareth, Afulah, Beisan, Jenin and Samakh. Its name, which has been described as perhaps misleading since very limited fighting took place near Tel Megiddo, was chosen by Allenby for its biblical and symbolic resonance. The battle was the final Allied offensive of the Sinai and Palestine Campaign of the First World War. The contending forces were the Allied Egyptian Expeditionary Force, of three corps including one of mounted troops, and the Ottoman Yildirim Army Group which numbered three armies, each the strength of barely an Allied corps. The series of battles took place in what was then the central and northern parts of Ottoman Palestine and parts of present-day Israel, Syria and Jordan. After forces of the Arab Revolt attacked the Ottoman lines of communication, distracting the Ottomans, British and Indian infantry divisions attacked and broke through the Ottoman defensive lines in the sector adjacent to the coast in the set-piece Battle of Sharon. The Desert Mounted Corps rode through the breach and almost encircled the Ottoman Seventh and Eighth armies still fighting in the Judean Hills. The subsidiary Battle of Nablus was fought virtually simultaneously in the Judean Hills in front of Nablus and at crossings of the Jordan River. The Ottoman Fourth Army was subsequently attacked in the Hills of Moab at Es Salt and Amman. These battles resulted in many tens of thousands of prisoners and many miles of territory being captured by the Allies. Following the battles, Daraa was captured on 27 September, Damascus on 1 October and operations at Haritan, north of Aleppo, were still in progress when the Armistice of Mudros was signed ending hostilities between the Allies and Ottomans. The operations of General Edmund Allenby, the British commander of the Egyptian Expeditionary Force, achieved decisive results at comparatively little cost, in contrast to many offensives during the First World War. Allenby achieved this through the use of creeping barrages to cover set-piece infantry attacks to break a state of trench warfare and then use his mobile forces (cavalry, armoured cars and aircraft) to encircle the Ottoman armies&#39; positions in the Judean Hills, cutting off their lines of retreat. The irregular forces of the Arab Revolt also played a part in this victory.
-## 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      The Battle of Rafa, also known as the Action of Rafah, fought on 9 January 1917, was the third and final battle to complete the recapture of the Sinai Peninsula by British forces during the Sinai and Palestine campaign of the First World War. The Desert Column of the Egyptian Expeditionary Force (EEF) attacked an entrenched Ottoman Army garrison at El Magruntein to the south of Rafah, close to the frontier between the Sultanate of Egypt and the Ottoman Empire, to the north and east of Sheikh Zowaiid. The attack marked the beginning of fighting in the Ottoman territory of Palestine. After the British Empire victories at the Battle of Romani in August 1916 and the Battle of Magdhaba in December, the Ottoman Army had been forced back to the southern edge of Palestine as the EEF pushed eastwards supported by extended lines of communication. This advance depended on the construction of a railway and a water pipeline. With the railway reaching El Arish on 4 January 1917, an attack on Rafa by the newly-formed Desert Column became possible. During the day-long assault, the Ottoman garrison defended El Magruntein&#39;s series of fortified redoubts and trenches on rising ground surrounded by flat grassland. They were eventually encircled by Australian Light Horsemen, New Zealand mounted riflemen, mounted yeomanry, cameliers and armoured cars. In the late afternoon, the New Zealand Mounted Rifles Brigade captured the central redoubt and the remaining defences were occupied shortly afterwards.</code></pre>
-<pre class="r"><code>write.csv(Middle_Eastern_theatre_of_World_War_I,file=&#39;Middle_Eastern_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
+<pre class="r"><code># Middle_Eastern_theatre_of_World_War_I &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I&quot;)
+# dim(Middle_Eastern_theatre_of_World_War_I)
+# head(Middle_Eastern_theatre_of_World_War_I, 3)
+# write.csv(Middle_Eastern_theatre_of_World_War_I,file=&#39;Middle_Eastern_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 <div id="part-3-4-5-and-more" class="section level2">
 <h2>Part 3, 4, 5 and more</h2>
@@ -753,27 +514,10 @@ for (battles in vector_battles) {
 <h3>Africa</h3>
 <pre class="r"><code>#Africa, from https://dbpedia.org/page/African_theatre_of_World_War_I
 
-African_theatre_of_World_War_I &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/African_theatre_of_World_War_I&quot;)
-dim(African_theatre_of_World_War_I)</code></pre>
-<pre><code>## [1] 38  6</code></pre>
-<pre class="r"><code>head(African_theatre_of_World_War_I, 3)</code></pre>
-<pre><code>##       lat    long
-## 1 6.13194 1.22278
-## 2  -6.307  34.854
-## 3 3.86667 11.5167
-##                                                                                                                                                                                                                                    causalties
-## 1                                                                                                                                                                                                                        French:, British: 83
-## 2 22,000, 5,000, 12,000+, *dead, 11,189 soldiers killed, 15,650 porters died, 2,620 soldiers killed, 5,533 soldiers killed, 5,640 soldiers missing/, 95,000 porters died, Total: 40,000+ military casualties, unknown number of porter deaths
-## 3                                                                                                                                                                                                                 France:, Britain:, 906, 917
-##   date                  name
-## 1 1914     Togoland Campaign
-## 2 1914 East African campaign
-## 3 1914      Kamerun campaign
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          desc
-## 1                                                                                                                                          The Togoland Campaign (6â€“26 August 1914) was a French and British invasion of the German colony of Togoland in West Africa, which began the West African Campaign of the First World War. German colonial forces withdrew from the capital LomÃ© and the coastal province to fight delaying actions on the route north to , where the Kamina Funkstation (wireless transmitter) linked the government in Berlin to Togoland, the Atlantic and South America. The main British and French force from the neighbouring colonies of Gold Coast and Dahomey advanced from the coast up the road and railway, as smaller forces converged on Kamina from the north. The German defenders were able to delay the invaders for several days at the Affair of Agbeluvoe (affair, an action or engagement not of sufficient magnitude to be called a battle) and the Affair of Khra but surrendered the colony on 26 August 1914. In 1916, Togoland was partitioned by the victors and in July 1922, British Togoland and French Togoland were established as League of Nations mandates.
-## 2 The East African campaign in World War I was a series of battles and guerrilla actions, which started in German East Africa (GEA) and spread to portions of Mozambique, Rhodesia, British East Africa, the Uganda, and the Belgian Congo. The campaign all but ended in German East Africa in November 1917 when the Germans entered Mozambique and continued the campaign living off Portuguese supplies. The strategy of the German colonial forces, led by Lieutenant Colonel (later Generalmajor) Paul von Lettow-Vorbeck, was to divert Allied forces from the Western Front to Africa. His strategy achieved only mixed results after 1916 when he was driven out of German East Africa. The campaign in Africa consumed considerable amounts of money and war material that could have gone to other fronts. The Germans in East Africa fought for the whole of the war, receiving word of the armistice on 14 November 1918 at 07:30 hours. Both sides waited for confirmation, with the Germans formally surrendering on 25 November. GEA became two League of Nations Class B Mandates, Tanganyika Territory of the United Kingdom and Ruanda-Urundi of Belgium, while the Kionga Triangle was ceded to Portugal.
-## 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               The Kamerun campaign took place in the German colony of Kamerun in the African theatre of the First World War when the British, French and Belgians invaded the German colony from August 1914 to March 1916. Most of the campaign took place in Kamerun but skirmishes also broke out in British Nigeria. By the Spring of 1916, following Allied victories, the majority of German troops and the civil administration fled to the neighbouring neutral colony of Spanish Guinea (RÃ­o Muni). The campaign ended in a defeat for Germany and the partition of its former colony between France and Britain.</code></pre>
-<pre class="r"><code>write.csv(African_theatre_of_World_War_I,file=&#39;African_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
+# African_theatre_of_World_War_I &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/African_theatre_of_World_War_I&quot;)
+# dim(African_theatre_of_World_War_I)
+# head(African_theatre_of_World_War_I, 3)
+# write.csv(African_theatre_of_World_War_I,file=&#39;African_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 <div id="europa" class="section level3">
 <h3>Europa</h3>
@@ -788,25 +532,22 @@ dim(African_theatre_of_World_War_I)</code></pre>
 ## 2: StartTag: invalid element name
 ## 3: StartTag: invalid element name
 ## 
-## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
-## StartTag: invalid element name
-## StartTag: invalid element name
-## StartTag: invalid element name
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 3: StartTag: invalid element name
-## 4: StartTag: invalid element name
-## 5: StartTag: invalid element name
-## 6: StartTag: invalid element name
-## 
 ## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
@@ -819,7 +560,233 @@ dim(African_theatre_of_World_War_I)</code></pre>
 ## 4: StartTag: invalid element name
 ## 5: StartTag: invalid element name
 ## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
 ## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
@@ -832,7 +799,226 @@ dim(African_theatre_of_World_War_I)</code></pre>
 ## 4: StartTag: invalid element name
 ## 5: StartTag: invalid element name
 ## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
+## 19: StartTag: invalid element name
+## 20: StartTag: invalid element name
+## 21: StartTag: invalid element name
+## 22: StartTag: invalid element name
+## 23: StartTag: invalid element name
+## 24: StartTag: invalid element name
+## 25: StartTag: invalid element name
+## 26: StartTag: invalid element name
+## 27: StartTag: invalid element name
+## 28: StartTag: invalid element name
+## 29: StartTag: invalid element name
+## 30: StartTag: invalid element name
+## 31: StartTag: invalid element name
+## 32: StartTag: invalid element name
+## 33: StartTag: invalid element name
+## 34: StartTag: invalid element name
+## 35: StartTag: invalid element name
+## 36: StartTag: invalid element name
+## 37: StartTag: invalid element name
+## 38: StartTag: invalid element name
+## 39: StartTag: invalid element name
+## 40: StartTag: invalid element name
+## 41: StartTag: invalid element name
+## 42: StartTag: invalid element name
+## 43: StartTag: invalid element name
+## 44: StartTag: invalid element name
+## 45: StartTag: invalid element name
+## 46: StartTag: invalid element name
+## 47: StartTag: invalid element name
+## 48: StartTag: invalid element name
+## 49: StartTag: invalid element name
+## 50: StartTag: invalid element name
+## 51: StartTag: invalid element name
+## 52: StartTag: invalid element name
+## 53: StartTag: invalid element name
+## 54: StartTag: invalid element name
+## 55: StartTag: invalid element name
+## 56: StartTag: invalid element name
+## 57: StartTag: invalid element name
+## 58: StartTag: invalid element name
+## 59: StartTag: invalid element name
+## 60: StartTag: invalid element name
+## 61: StartTag: invalid element name
+## 62: StartTag: invalid element name
+## 63: StartTag: invalid element name
+## 64: StartTag: invalid element name
+## 65: StartTag: invalid element name
+## 66: StartTag: invalid element name
+## 67: StartTag: invalid element name
+## 68: StartTag: invalid element name
+## 69: StartTag: invalid element name
+## 70: StartTag: invalid element name
+## 71: StartTag: invalid element name
+## 72: StartTag: invalid element name
+## 73: StartTag: invalid element name
+## 74: StartTag: invalid element name
+## 75: StartTag: invalid element name
+## 76: StartTag: invalid element name
+## 77: StartTag: invalid element name
+## 78: StartTag: invalid element name
+## 79: StartTag: invalid element name
+## 80: StartTag: invalid element name
+## 81: StartTag: invalid element name
+## 82: StartTag: invalid element name
+## 83: StartTag: invalid element name
+## 84: StartTag: invalid element name
+## 85: StartTag: invalid element name
+## 86: StartTag: invalid element name
+## 87: StartTag: invalid element name
+## 88: StartTag: invalid element name
+## 89: StartTag: invalid element name
+## 90: StartTag: invalid element name
+## 91: StartTag: invalid element name
+## 92: StartTag: invalid element name
+## 93: StartTag: invalid element name
+## 94: StartTag: invalid element name
+## 95: StartTag: invalid element name
+## 96: StartTag: invalid element name
+## 97: StartTag: invalid element name
+## 98: StartTag: invalid element name
+## 99: StartTag: invalid element name
+## 100: StartTag: invalid element name
+## 101: StartTag: invalid element name
+## 102: StartTag: invalid element name
+## 103: StartTag: invalid element name
+## 104: StartTag: invalid element name
+## 105: StartTag: invalid element name
+## 106: StartTag: invalid element name
+## 107: StartTag: invalid element name
+## 108: StartTag: invalid element name
+## 109: StartTag: invalid element name
+## 110: StartTag: invalid element name
+## 111: StartTag: invalid element name
+## 112: StartTag: invalid element name
+## 113: StartTag: invalid element name
+## 114: StartTag: invalid element name
+## 115: StartTag: invalid element name
+## 116: StartTag: invalid element name
+## 117: StartTag: invalid element name
+## 118: StartTag: invalid element name
+## 119: StartTag: invalid element name
+## 120: StartTag: invalid element name
+## 121: StartTag: invalid element name
+## 122: StartTag: invalid element name
+## 123: StartTag: invalid element name
+## 124: StartTag: invalid element name
+## 125: StartTag: invalid element name
+## 126: StartTag: invalid element name
+## 127: StartTag: invalid element name
+## 128: StartTag: invalid element name
+## 129: StartTag: invalid element name
+## 130: StartTag: invalid element name
+## 131: StartTag: invalid element name
+## 132: StartTag: invalid element name
+## 133: StartTag: invalid element name
+## 134: StartTag: invalid element name
+## 135: StartTag: invalid element name
+## 136: StartTag: invalid element name
+## 137: StartTag: invalid element name
+## 138: StartTag: invalid element name
+## 139: StartTag: invalid element name
+## 140: StartTag: invalid element name
+## 141: StartTag: invalid element name
+## 142: StartTag: invalid element name
+## 143: StartTag: invalid element name
+## 144: StartTag: invalid element name
+## 145: StartTag: invalid element name
+## 146: StartTag: invalid element name
+## 147: StartTag: invalid element name
+## 148: StartTag: invalid element name
+## 149: StartTag: invalid element name
+## 150: StartTag: invalid element name
+## 151: StartTag: invalid element name
+## 152: StartTag: invalid element name
+## 153: StartTag: invalid element name
+## 154: StartTag: invalid element name
+## 155: StartTag: invalid element name
+## 156: StartTag: invalid element name
+## 157: StartTag: invalid element name
+## 158: StartTag: invalid element name
+## 159: StartTag: invalid element name
+## 160: StartTag: invalid element name
+## 161: StartTag: invalid element name
+## 162: StartTag: invalid element name
+## 163: StartTag: invalid element name
+## 164: StartTag: invalid element name
+## 165: StartTag: invalid element name
+## 166: StartTag: invalid element name
+## 167: StartTag: invalid element name
+## 168: StartTag: invalid element name
+## 169: StartTag: invalid element name
+## 170: StartTag: invalid element name
+## 171: StartTag: invalid element name
+## 172: StartTag: invalid element name
+## 173: StartTag: invalid element name
+## 174: StartTag: invalid element name
+## 175: StartTag: invalid element name
+## 176: StartTag: invalid element name
+## 177: StartTag: invalid element name
+## 178: StartTag: invalid element name
+## 179: StartTag: invalid element name
+## 180: StartTag: invalid element name
+## 181: StartTag: invalid element name
+## 182: StartTag: invalid element name
+## 183: StartTag: invalid element name
+## 184: StartTag: invalid element name
+## 185: StartTag: invalid element name
+## 186: StartTag: invalid element name
+## 187: StartTag: invalid element name
+## 188: StartTag: invalid element name
+## 189: StartTag: invalid element name
+## 190: StartTag: invalid element name
+## 191: StartTag: invalid element name
+## 192: StartTag: invalid element name
+## 193: StartTag: invalid element name
+## 194: StartTag: invalid element name
+## 195: StartTag: invalid element name
+## 196: StartTag: invalid element name
+## 197: StartTag: invalid element name
+## 198: StartTag: invalid element name
+## 199: StartTag: invalid element name
+## 200: StartTag: invalid element name
+## 201: StartTag: invalid element name
+## 202: StartTag: invalid element name
+## 203: StartTag: invalid element name
+## 204: StartTag: invalid element name
+## 205: StartTag: invalid element name
+## 206: StartTag: invalid element name
+## 207: StartTag: invalid element name
+## 208: StartTag: invalid element name
+## 209: StartTag: invalid element name
+## 210: StartTag: invalid element name
+## 211: StartTag: invalid element name
+## 212: StartTag: invalid element name
+## 213: StartTag: invalid element name
+## 214: StartTag: invalid element name
+## 215: StartTag: invalid element name
+## 216: StartTag: invalid element name
+## 217: StartTag: invalid element name
+## 218: StartTag: invalid element name
 ## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
@@ -845,14 +1031,39 @@ dim(African_theatre_of_World_War_I)</code></pre>
 ## 4: StartTag: invalid element name
 ## 5: StartTag: invalid element name
 ## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
 ## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name
-## 2: StartTag: invalid element name
-## 3: StartTag: invalid element name
-## 
+## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
@@ -861,70 +1072,1508 @@ dim(African_theatre_of_World_War_I)</code></pre>
 ## 2: StartTag: invalid element name
 ## 3: StartTag: invalid element name
 ## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
 ## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
 ## StartTag: invalid element name
 ## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
+## 19: StartTag: invalid element name
+## 20: StartTag: invalid element name
+## 21: StartTag: invalid element name
+## 22: StartTag: invalid element name
+## 23: StartTag: invalid element name
+## 24: StartTag: invalid element name
+## 25: StartTag: invalid element name
+## 26: StartTag: invalid element name
+## 27: StartTag: invalid element name
+## 28: StartTag: invalid element name
+## 29: StartTag: invalid element name
+## 30: StartTag: invalid element name
+## 31: StartTag: invalid element name
+## 32: StartTag: invalid element name
+## 33: StartTag: invalid element name
+## 34: StartTag: invalid element name
+## 35: StartTag: invalid element name
+## 36: StartTag: invalid element name
+## 37: StartTag: invalid element name
+## 38: StartTag: invalid element name
+## 39: StartTag: invalid element name
+## 40: StartTag: invalid element name
+## 41: StartTag: invalid element name
+## 42: StartTag: invalid element name
+## 43: StartTag: invalid element name
+## 44: StartTag: invalid element name
+## 45: StartTag: invalid element name
+## 46: StartTag: invalid element name
+## 47: StartTag: invalid element name
+## 48: StartTag: invalid element name
+## 49: StartTag: invalid element name
+## 50: StartTag: invalid element name
+## 51: StartTag: invalid element name
+## 52: StartTag: invalid element name
+## 53: StartTag: invalid element name
+## 54: StartTag: invalid element name
+## 55: StartTag: invalid element name
+## 56: StartTag: invalid element name
+## 57: StartTag: invalid element name
+## 58: StartTag: invalid element name
+## 59: StartTag: invalid element name
+## 60: StartTag: invalid element name
+## 61: StartTag: invalid element name
+## 62: StartTag: invalid element name
+## 63: StartTag: invalid element name
+## 64: StartTag: invalid element name
+## 65: StartTag: invalid element name
+## 66: StartTag: invalid element name
+## 67: StartTag: invalid element name
+## 68: StartTag: invalid element name
+## 69: StartTag: invalid element name
+## 70: StartTag: invalid element name
+## 71: StartTag: invalid element name
+## 72: StartTag: invalid element name
+## 73: StartTag: invalid element name
+## 74: StartTag: invalid element name
+## 75: StartTag: invalid element name
+## 76: StartTag: invalid element name
+## 77: StartTag: invalid element name
+## 78: StartTag: invalid element name
+## 79: StartTag: invalid element name
+## 80: StartTag: invalid element name
+## 81: StartTag: invalid element name
+## 82: StartTag: invalid element name
+## 83: StartTag: invalid element name
+## 84: StartTag: invalid element name
+## 85: StartTag: invalid element name
+## 86: StartTag: invalid element name
+## 87: StartTag: invalid element name
+## 88: StartTag: invalid element name
+## 89: StartTag: invalid element name
+## 90: StartTag: invalid element name
+## 91: StartTag: invalid element name
+## 92: StartTag: invalid element name
+## 93: StartTag: invalid element name
+## 94: StartTag: invalid element name
+## 95: StartTag: invalid element name
+## 96: StartTag: invalid element name
+## 97: StartTag: invalid element name
+## 98: StartTag: invalid element name
+## 99: StartTag: invalid element name
+## 100: StartTag: invalid element name
+## 101: StartTag: invalid element name
+## 102: StartTag: invalid element name
+## 103: StartTag: invalid element name
+## 104: StartTag: invalid element name
+## 105: StartTag: invalid element name
+## 106: StartTag: invalid element name
+## 107: StartTag: invalid element name
+## 108: StartTag: invalid element name
+## 109: StartTag: invalid element name
+## 110: StartTag: invalid element name
+## 111: StartTag: invalid element name
+## 112: StartTag: invalid element name
+## 113: StartTag: invalid element name
+## 114: StartTag: invalid element name
+## 115: StartTag: invalid element name
+## 116: StartTag: invalid element name
+## 117: StartTag: invalid element name
+## 118: StartTag: invalid element name
+## 119: StartTag: invalid element name
+## 120: StartTag: invalid element name
+## 121: StartTag: invalid element name
+## 122: StartTag: invalid element name
+## 123: StartTag: invalid element name
+## 124: StartTag: invalid element name
+## 125: StartTag: invalid element name
+## 126: StartTag: invalid element name
+## 127: StartTag: invalid element name
+## 128: StartTag: invalid element name
+## 129: StartTag: invalid element name
+## 130: StartTag: invalid element name
+## 131: StartTag: invalid element name
+## 132: StartTag: invalid element name
+## 133: StartTag: invalid element name
+## 134: StartTag: invalid element name
+## 135: StartTag: invalid element name
+## 136: StartTag: invalid element name
+## 137: StartTag: invalid element name
+## 138: StartTag: invalid element name
+## 139: StartTag: invalid element name
+## 140: StartTag: invalid element name
+## 141: StartTag: invalid element name
+## 142: StartTag: invalid element name
+## 143: StartTag: invalid element name
+## 144: StartTag: invalid element name
+## 145: StartTag: invalid element name
+## 146: StartTag: invalid element name
+## 147: StartTag: invalid element name
+## 148: StartTag: invalid element name
+## 149: StartTag: invalid element name
+## 150: StartTag: invalid element name
+## 151: StartTag: invalid element name
+## 152: StartTag: invalid element name
+## 153: StartTag: invalid element name
+## 154: StartTag: invalid element name
+## 155: StartTag: invalid element name
+## 156: StartTag: invalid element name
+## 157: StartTag: invalid element name
+## 158: StartTag: invalid element name
+## 159: StartTag: invalid element name
+## 160: StartTag: invalid element name
+## 161: StartTag: invalid element name
+## 162: StartTag: invalid element name
+## 163: StartTag: invalid element name
+## 164: StartTag: invalid element name
+## 165: StartTag: invalid element name
+## 166: StartTag: invalid element name
+## 167: StartTag: invalid element name
+## 168: StartTag: invalid element name
+## 169: StartTag: invalid element name
+## 170: StartTag: invalid element name
+## 171: StartTag: invalid element name
+## 172: StartTag: invalid element name
+## 173: StartTag: invalid element name
+## 174: StartTag: invalid element name
+## 175: StartTag: invalid element name
+## 176: StartTag: invalid element name
+## 177: StartTag: invalid element name
+## 178: StartTag: invalid element name
+## 179: StartTag: invalid element name
+## 180: StartTag: invalid element name
+## 181: StartTag: invalid element name
+## 182: StartTag: invalid element name
+## 183: StartTag: invalid element name
+## 184: StartTag: invalid element name
+## 185: StartTag: invalid element name
+## 186: StartTag: invalid element name
+## 187: StartTag: invalid element name
+## 188: StartTag: invalid element name
+## 189: StartTag: invalid element name
+## 190: StartTag: invalid element name
+## 191: StartTag: invalid element name
+## 192: StartTag: invalid element name
+## 193: StartTag: invalid element name
+## 194: StartTag: invalid element name
+## 195: StartTag: invalid element name
+## 196: StartTag: invalid element name
+## 197: StartTag: invalid element name
+## 198: StartTag: invalid element name
+## 199: StartTag: invalid element name
+## 200: StartTag: invalid element name
+## 201: StartTag: invalid element name
+## 202: StartTag: invalid element name
+## 203: StartTag: invalid element name
+## 204: StartTag: invalid element name
+## 205: StartTag: invalid element name
+## 206: StartTag: invalid element name
+## 207: StartTag: invalid element name
+## 208: StartTag: invalid element name
+## 209: StartTag: invalid element name
+## 210: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
+## 19: StartTag: invalid element name
+## 20: StartTag: invalid element name
+## 21: StartTag: invalid element name
+## 22: StartTag: invalid element name
+## 23: StartTag: invalid element name
+## 24: StartTag: invalid element name
+## 25: StartTag: invalid element name
+## 26: StartTag: invalid element name
+## 27: StartTag: invalid element name
+## 28: StartTag: invalid element name
+## 29: StartTag: invalid element name
+## 30: StartTag: invalid element name
+## 31: StartTag: invalid element name
+## 32: StartTag: invalid element name
+## 33: StartTag: invalid element name
+## 34: StartTag: invalid element name
+## 35: StartTag: invalid element name
+## 36: StartTag: invalid element name
+## 37: StartTag: invalid element name
+## 38: StartTag: invalid element name
+## 39: StartTag: invalid element name
+## 40: StartTag: invalid element name
+## 41: StartTag: invalid element name
+## 42: StartTag: invalid element name
+## 43: StartTag: invalid element name
+## 44: StartTag: invalid element name
+## 45: StartTag: invalid element name
+## 46: StartTag: invalid element name
+## 47: StartTag: invalid element name
+## 48: StartTag: invalid element name
+## 49: StartTag: invalid element name
+## 50: StartTag: invalid element name
+## 51: StartTag: invalid element name
+## 52: StartTag: invalid element name
+## 53: StartTag: invalid element name
+## 54: StartTag: invalid element name
+## 55: StartTag: invalid element name
+## 56: StartTag: invalid element name
+## 57: StartTag: invalid element name
+## 58: StartTag: invalid element name
+## 59: StartTag: invalid element name
+## 60: StartTag: invalid element name
+## 61: StartTag: invalid element name
+## 62: StartTag: invalid element name
+## 63: StartTag: invalid element name
+## 64: StartTag: invalid element name
+## 65: StartTag: invalid element name
+## 66: StartTag: invalid element name
+## 67: StartTag: invalid element name
+## 68: StartTag: invalid element name
+## 69: StartTag: invalid element name
+## 70: StartTag: invalid element name
+## 71: StartTag: invalid element name
+## 72: StartTag: invalid element name
+## 73: StartTag: invalid element name
+## 74: StartTag: invalid element name
+## 75: StartTag: invalid element name
+## 76: StartTag: invalid element name
+## 77: StartTag: invalid element name
+## 78: StartTag: invalid element name
+## 79: StartTag: invalid element name
+## 80: StartTag: invalid element name
+## 81: StartTag: invalid element name
+## 82: StartTag: invalid element name
+## 83: StartTag: invalid element name
+## 84: StartTag: invalid element name
+## 85: StartTag: invalid element name
+## 86: StartTag: invalid element name
+## 87: StartTag: invalid element name
+## 88: StartTag: invalid element name
+## 89: StartTag: invalid element name
+## 90: StartTag: invalid element name
+## 91: StartTag: invalid element name
+## 92: StartTag: invalid element name
+## 93: StartTag: invalid element name
+## 94: StartTag: invalid element name
+## 95: StartTag: invalid element name
+## 96: StartTag: invalid element name
+## 97: StartTag: invalid element name
+## 98: StartTag: invalid element name
+## 99: StartTag: invalid element name
+## 100: StartTag: invalid element name
+## 101: StartTag: invalid element name
+## 102: StartTag: invalid element name
+## 103: StartTag: invalid element name
+## 104: StartTag: invalid element name
+## 105: StartTag: invalid element name
+## 106: StartTag: invalid element name
+## 107: StartTag: invalid element name
+## 108: StartTag: invalid element name
+## 109: StartTag: invalid element name
+## 110: StartTag: invalid element name
+## 111: StartTag: invalid element name
+## 112: StartTag: invalid element name
+## 113: StartTag: invalid element name
+## 114: StartTag: invalid element name
+## 115: StartTag: invalid element name
+## 116: StartTag: invalid element name
+## 117: StartTag: invalid element name
+## 118: StartTag: invalid element name
+## 119: StartTag: invalid element name
+## 120: StartTag: invalid element name
+## 121: StartTag: invalid element name
+## 122: StartTag: invalid element name
+## 123: StartTag: invalid element name
+## 124: StartTag: invalid element name
+## 125: StartTag: invalid element name
+## 126: StartTag: invalid element name
+## 127: StartTag: invalid element name
+## 128: StartTag: invalid element name
+## 129: StartTag: invalid element name
+## 130: StartTag: invalid element name
+## 131: StartTag: invalid element name
+## 132: StartTag: invalid element name
+## 133: StartTag: invalid element name
+## 134: StartTag: invalid element name
+## 135: StartTag: invalid element name
+## 136: StartTag: invalid element name
+## 137: StartTag: invalid element name
+## 138: StartTag: invalid element name
+## 139: StartTag: invalid element name
+## 140: StartTag: invalid element name
+## 141: StartTag: invalid element name
+## 142: StartTag: invalid element name
+## 143: StartTag: invalid element name
+## 144: StartTag: invalid element name
+## 145: StartTag: invalid element name
+## 146: StartTag: invalid element name
+## 147: StartTag: invalid element name
+## 148: StartTag: invalid element name
+## 149: StartTag: invalid element name
+## 150: StartTag: invalid element name
+## 151: StartTag: invalid element name
+## 152: StartTag: invalid element name
+## 153: StartTag: invalid element name
+## 154: StartTag: invalid element name
+## 155: StartTag: invalid element name
+## 156: StartTag: invalid element name
+## 157: StartTag: invalid element name
+## 158: StartTag: invalid element name
+## 159: StartTag: invalid element name
+## 160: StartTag: invalid element name
+## 161: StartTag: invalid element name
+## 162: StartTag: invalid element name
+## 163: StartTag: invalid element name
+## 164: StartTag: invalid element name
+## 165: StartTag: invalid element name
+## 166: StartTag: invalid element name
+## 167: StartTag: invalid element name
+## 168: StartTag: invalid element name
+## 169: StartTag: invalid element name
+## 170: StartTag: invalid element name
+## 171: StartTag: invalid element name
+## 172: StartTag: invalid element name
+## 173: StartTag: invalid element name
+## 174: StartTag: invalid element name
+## 175: StartTag: invalid element name
+## 176: StartTag: invalid element name
+## 177: StartTag: invalid element name
+## 178: StartTag: invalid element name
+## 179: StartTag: invalid element name
+## 180: StartTag: invalid element name
+## 181: StartTag: invalid element name
+## 182: StartTag: invalid element name
+## 183: StartTag: invalid element name
+## 184: StartTag: invalid element name
+## 185: StartTag: invalid element name
+## 186: StartTag: invalid element name
+## 187: StartTag: invalid element name
+## 188: StartTag: invalid element name
+## 189: StartTag: invalid element name
+## 190: StartTag: invalid element name
+## 191: StartTag: invalid element name
+## 192: StartTag: invalid element name
+## 193: StartTag: invalid element name
+## 194: StartTag: invalid element name
+## 195: StartTag: invalid element name
+## 196: StartTag: invalid element name
+## 197: StartTag: invalid element name
+## 198: StartTag: invalid element name
+## 199: StartTag: invalid element name
+## 200: StartTag: invalid element name
+## 201: StartTag: invalid element name
+## 202: StartTag: invalid element name
+## 203: StartTag: invalid element name
+## 204: StartTag: invalid element name
+## 205: StartTag: invalid element name
+## 206: StartTag: invalid element name
+## 207: StartTag: invalid element name
+## 208: StartTag: invalid element name
+## 209: StartTag: invalid element name
+## 210: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
+## 19: StartTag: invalid element name
+## 20: StartTag: invalid element name
+## 21: StartTag: invalid element name
+## 22: StartTag: invalid element name
+## 23: StartTag: invalid element name
+## 24: StartTag: invalid element name
+## 25: StartTag: invalid element name
+## 26: StartTag: invalid element name
+## 27: StartTag: invalid element name
+## 28: StartTag: invalid element name
+## 29: StartTag: invalid element name
+## 30: StartTag: invalid element name
+## 31: StartTag: invalid element name
+## 32: StartTag: invalid element name
+## 33: StartTag: invalid element name
+## 34: StartTag: invalid element name
+## 35: StartTag: invalid element name
+## 36: StartTag: invalid element name
+## 37: StartTag: invalid element name
+## 38: StartTag: invalid element name
+## 39: StartTag: invalid element name
+## 40: StartTag: invalid element name
+## 41: StartTag: invalid element name
+## 42: StartTag: invalid element name
+## 43: StartTag: invalid element name
+## 44: StartTag: invalid element name
+## 45: StartTag: invalid element name
+## 46: StartTag: invalid element name
+## 47: StartTag: invalid element name
+## 48: StartTag: invalid element name
+## 49: StartTag: invalid element name
+## 50: StartTag: invalid element name
+## 51: StartTag: invalid element name
+## 52: StartTag: invalid element name
+## 53: StartTag: invalid element name
+## 54: StartTag: invalid element name
+## 55: StartTag: invalid element name
+## 56: StartTag: invalid element name
+## 57: StartTag: invalid element name
+## 58: StartTag: invalid element name
+## 59: StartTag: invalid element name
+## 60: StartTag: invalid element name
+## 61: StartTag: invalid element name
+## 62: StartTag: invalid element name
+## 63: StartTag: invalid element name
+## 64: StartTag: invalid element name
+## 65: StartTag: invalid element name
+## 66: StartTag: invalid element name
+## 67: StartTag: invalid element name
+## 68: StartTag: invalid element name
+## 69: StartTag: invalid element name
+## 70: StartTag: invalid element name
+## 71: StartTag: invalid element name
+## 72: StartTag: invalid element name
+## 73: StartTag: invalid element name
+## 74: StartTag: invalid element name
+## 75: StartTag: invalid element name
+## 76: StartTag: invalid element name
+## 77: StartTag: invalid element name
+## 78: StartTag: invalid element name
+## 79: StartTag: invalid element name
+## 80: StartTag: invalid element name
+## 81: StartTag: invalid element name
+## 82: StartTag: invalid element name
+## 83: StartTag: invalid element name
+## 84: StartTag: invalid element name
+## 85: StartTag: invalid element name
+## 86: StartTag: invalid element name
+## 87: StartTag: invalid element name
+## 88: StartTag: invalid element name
+## 89: StartTag: invalid element name
+## 90: StartTag: invalid element name
+## 91: StartTag: invalid element name
+## 92: StartTag: invalid element name
+## 93: StartTag: invalid element name
+## 94: StartTag: invalid element name
+## 95: StartTag: invalid element name
+## 96: StartTag: invalid element name
+## 97: StartTag: invalid element name
+## 98: StartTag: invalid element name
+## 99: StartTag: invalid element name
+## 100: StartTag: invalid element name
+## 101: StartTag: invalid element name
+## 102: StartTag: invalid element name
+## 103: StartTag: invalid element name
+## 104: StartTag: invalid element name
+## 105: StartTag: invalid element name
+## 106: StartTag: invalid element name
+## 107: StartTag: invalid element name
+## 108: StartTag: invalid element name
+## 109: StartTag: invalid element name
+## 110: StartTag: invalid element name
+## 111: StartTag: invalid element name
+## 112: StartTag: invalid element name
+## 113: StartTag: invalid element name
+## 114: StartTag: invalid element name
+## 115: StartTag: invalid element name
+## 116: StartTag: invalid element name
+## 117: StartTag: invalid element name
+## 118: StartTag: invalid element name
+## 119: StartTag: invalid element name
+## 120: StartTag: invalid element name
+## 121: StartTag: invalid element name
+## 122: StartTag: invalid element name
+## 123: StartTag: invalid element name
+## 124: StartTag: invalid element name
+## 125: StartTag: invalid element name
+## 126: StartTag: invalid element name
+## 127: StartTag: invalid element name
+## 128: StartTag: invalid element name
+## 129: StartTag: invalid element name
+## 130: StartTag: invalid element name
+## 131: StartTag: invalid element name
+## 132: StartTag: invalid element name
+## 133: StartTag: invalid element name
+## 134: StartTag: invalid element name
+## 135: StartTag: invalid element name
+## 136: StartTag: invalid element name
+## 137: StartTag: invalid element name
+## 138: StartTag: invalid element name
+## 139: StartTag: invalid element name
+## 140: StartTag: invalid element name
+## 141: StartTag: invalid element name
+## 142: StartTag: invalid element name
+## 143: StartTag: invalid element name
+## 144: StartTag: invalid element name
+## 145: StartTag: invalid element name
+## 146: StartTag: invalid element name
+## 147: StartTag: invalid element name
+## 148: StartTag: invalid element name
+## 149: StartTag: invalid element name
+## 150: StartTag: invalid element name
+## 151: StartTag: invalid element name
+## 152: StartTag: invalid element name
+## 153: StartTag: invalid element name
+## 154: StartTag: invalid element name
+## 155: StartTag: invalid element name
+## 156: StartTag: invalid element name
+## 157: StartTag: invalid element name
+## 158: StartTag: invalid element name
+## 159: StartTag: invalid element name
+## 160: StartTag: invalid element name
+## 161: StartTag: invalid element name
+## 162: StartTag: invalid element name
+## 163: StartTag: invalid element name
+## 164: StartTag: invalid element name
+## 165: StartTag: invalid element name
+## 166: StartTag: invalid element name
+## 167: StartTag: invalid element name
+## 168: StartTag: invalid element name
+## 169: StartTag: invalid element name
+## 170: StartTag: invalid element name
+## 171: StartTag: invalid element name
+## 172: StartTag: invalid element name
+## 173: StartTag: invalid element name
+## 174: StartTag: invalid element name
+## 175: StartTag: invalid element name
+## 176: StartTag: invalid element name
+## 177: StartTag: invalid element name
+## 178: StartTag: invalid element name
+## 179: StartTag: invalid element name
+## 180: StartTag: invalid element name
+## 181: StartTag: invalid element name
+## 182: StartTag: invalid element name
+## 183: StartTag: invalid element name
+## 184: StartTag: invalid element name
+## 185: StartTag: invalid element name
+## 186: StartTag: invalid element name
+## 187: StartTag: invalid element name
+## 188: StartTag: invalid element name
+## 189: StartTag: invalid element name
+## 190: StartTag: invalid element name
+## 191: StartTag: invalid element name
+## 192: StartTag: invalid element name
+## 193: StartTag: invalid element name
+## 194: StartTag: invalid element name
+## 195: StartTag: invalid element name
+## 196: StartTag: invalid element name
+## 197: StartTag: invalid element name
+## 198: StartTag: invalid element name
+## 199: StartTag: invalid element name
+## 200: StartTag: invalid element name
+## 201: StartTag: invalid element name
+## 202: StartTag: invalid element name
+## 203: StartTag: invalid element name
+## 204: StartTag: invalid element name
+## 205: StartTag: invalid element name
+## 206: StartTag: invalid element name
+## 207: StartTag: invalid element name
+## 208: StartTag: invalid element name
+## 209: StartTag: invalid element name
+## 210: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
 ## 
 ## StartTag: invalid element name
-## Error : 1: StartTag: invalid element name</code></pre>
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 
+## Error : Argument object must be of type character or raw vector if serialize is FALSE
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## Error : 1: StartTag: invalid element name
+## 2: StartTag: invalid element name
+## 3: StartTag: invalid element name
+## 4: StartTag: invalid element name
+## 5: StartTag: invalid element name
+## 6: StartTag: invalid element name
+## 7: StartTag: invalid element name
+## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
+## 17: StartTag: invalid element name
+## 18: StartTag: invalid element name
+## 19: StartTag: invalid element name
+## 20: StartTag: invalid element name
+## 21: StartTag: invalid element name
+## 22: StartTag: invalid element name
+## 23: StartTag: invalid element name
+## 24: StartTag: invalid element name
+## 25: StartTag: invalid element name
+## 26: StartTag: invalid element name
+## 27: StartTag: invalid element name
+## 28: StartTag: invalid element name
+## 29: StartTag: invalid element name
+## 30: StartTag: invalid element name</code></pre>
 <pre class="r"><code>dim(European_theatre_of_World_War_I)</code></pre>
-<pre><code>## [1] 137   6</code></pre>
-<pre class="r"><code>head(European_theatre_of_World_War_I, 3)</code></pre>
-<pre><code>##       lat    long                              causalties date
-## 1   50.89   2.922 Over 75% of Canadians killed or wounded 1915
-## 2 50.4583 2.79417                                  59,247 1915
-## 3 50.7625 2.89528                                  24,562 1917
-##                         name
-## 1 Battle of Kitcheners&#39; Wood
-## 2             Battle of Loos
-## 3         Battle of Messines
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      desc
-## 1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         The Battle of Kitcheners&#39; Wood was fought during World War I during the Second Battle of Ypres.
-## 2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     The Battle of Loos took place from 25 September to 8 October 1915 in France on the Western Front, during the First World War. It was the biggest British attack of 1915, the first time that the British used poison gas and the first mass engagement of New Army units. The French and British tried to break through the German defences in Artois and Champagne and restore a war of movement. Despite improved methods, more ammunition and better equipment, the Franco-British attacks were largely contained by the Germans, except for local losses of ground. The British gas attack failed to neutralize the defenders and the artillery bombardment was too short to destroy the barbed wire or machine gun nests. German tactical defensive proficiency was still dramatically superior to the British offensive planning and doctrine, resulting in a British defeat.
-## 3 The Battle of Messines (7â€“14 June 1917) was an attack by the British Second Army (General Sir Herbert Plumer), on the Western Front, near the village of Messines (now Mesen) in West Flanders, Belgium, during the First World War. The Nivelle Offensive in April and May had failed to achieve its more grandiose aims, had led to the demoralisation of French troops and confounded the Anglo-French strategy for 1917. The attack forced the Germans to move reserves to Flanders from the Arras and Aisne fronts, relieving pressure on the French. The British tactical objective was to capture the German defences on the ridge, which ran from Ploegsteert Wood (Plugstreet to the British) in the south, through Messines and Wytschaete to Mt Sorrel, depriving the German 4th Army of the high ground. The ridge gave commanding views of the British defences and back areas of Ypres to the north, from which the British intended to conduct the Northern Operation, an advance to Passchendaele Ridge and then the capture of the Belgian coast up to the Dutch frontier. The Second Army had five corps, three for the attack and two on the northern flank not part of the operation; XIV Corps was in General Headquarters reserve. The 4th Army divisions of Group Wytschaete (Gruppe Wijtschate, the IX Reserve Corps headquarters) held the ridge and were later reinforced by a division from Group Ypres (Gruppe Ypern). The British attacked with the II Anzac Corps (3rd Australian Division, New Zealand Division and the 25th Division, with the 4th Australian Division in reserve), IX Corps (36th (Ulster), 16th (Irish) and 19th (Western) divisions and the 11th (Northern) Division in reserve), X Corps (41st, 47th (1/2nd London) and 23rd Divisions with the 24th Division in reserve). XIV Corps in reserve (Guards, 1st, 8th and 32nd divisions). The 30th, 55th (West Lancashire), 39th and 38th (Welsh) divisions in II Corps and VIII Corps, guarded the northern flank and made probing attacks on 8 June. Gruppe Wijtschate held the ridge with the 204th, 35th, 2nd, 3rd Bavarian (relieving the 40th Division when the British attack began) and 4th Bavarian divisions, with the 7th Division and 1st Guard Reserve Division as Eingreif (counter-attack) divisions. The 24th Saxon Division, relieved on 5 June, was rushed back when the attack began and the 11th Division, in Gruppe Ypern reserve, arrived on 8 June. The battle began with the detonation of 19 mines beneath the German front position, which devastated it and left large craters. A creeping barrage, 700 yd (640 m) deep, began and protected the British troops as they secured the ridge with support from tanks, cavalry patrols and aircraft. The effect of the British mines, barrages and bombardments was improved by advances in artillery survey, flash spotting and centralised control of artillery from the Second Army headquarters. British attacks from 8 to 14 June advanced the front line beyond the former German Sehnenstellung (Chord Position, the Oosttaverne Line to the British). The battle was a prelude to the much larger Third Battle of Ypres, the preliminary bombardment for which began on 11 July 1917.</code></pre>
+<pre><code>## [1] 117   9</code></pre>
+<pre class="r"><code>head(European_theatre_of_World_War_I[1:8], 3)</code></pre>
+<pre><code>##       lat    long
+## 1   50.89   2.922
+## 2 50.4583 2.79417
+## 3 50.7625 2.89528
+##                                                                                          strength
+## 1 2 Canadian battalions, Elements of French Colonial forces, Unknown, but roughly equal or larger
+## 2                                                                        3 divisions, 6 divisions
+## 3                                                                       12 divisions, 5 divisions
+##                                causalties
+## 1 Over 75% of Canadians killed or wounded
+## 2                                  59,247
+## 3                                  24,562
+##                                              campaign
+## 1 Second_Battle_of_Ypres, Western_Front_(World_War_I)
+## 2                         Western_Front_(World_War_I)
+## 3                         Western_Front_(World_War_I)
+##                                                                                                      depiction
+## 1                                     https://upload.wikimedia.org/wikipedia/commons/9/96/Kitcheners&#39;_Wood.jpg
+## 2 https://upload.wikimedia.org/wikipedia/commons/7/7a/British_infantry_advancing_at_Loos_25_September_1915.jpg
+## 3                                       https://upload.wikimedia.org/wikipedia/commons/1/18/Mesen_-_City_1.jpg
+##   date                       name
+## 1 1915 Battle of Kitcheners&#39; Wood
+## 2 1915             Battle of Loos
+## 3 1917         Battle of Messines</code></pre>
 <pre class="r"><code>write.csv(European_theatre_of_World_War_I,file=&#39;European_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 <div id="asia" class="section level3">
 <h3>Asia</h3>
-<pre class="r"><code>Asian_and_Pacific_theatre_of_World_War_I &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I&quot;)
-dim(Asian_and_Pacific_theatre_of_World_War_I)</code></pre>
-<pre><code>## [1] 4 6</code></pre>
-<pre class="r"><code>head(Asian_and_Pacific_theatre_of_World_War_I, 3)</code></pre>
-<pre><code>##        lat     long
-## 1  36.0667  120.383
-## 2 -17.5333 -149.567
-## 3 -4.41667  152.317
-##                                                                                                          causalties
-## 1 1 protected cruiser sunk, 1 destroyer sunk, 727 killed, 1 aircraft destroyed, 1,335 wounded, 1 battleship damaged
-## 2                                                        1 gunboat sunk, 1 freighter sunk, Papeete severely damaged
-## 3                                                                                               5 wounded, 7 killed
-##   date                   name
-## 1 1914      Siege of Tsingtao
-## 2 1914 Bombardment of Papeete
-## 3 1914    Battle of Bita Paka
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        desc
-## 1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 The siege of Tsingtao (or Tsingtau) was the attack on the German port of Tsingtao (now Qingdao) in China during World War I by Japan and the United Kingdom. The siege was waged against Imperial Germany between 27 August and 7 November 1914. The siege was the first encounter between Japanese and German forces, the first Anglo-Japanese operation of the war, and the only major land battle in the Asian and Pacific theatre during World War I.
-## 2                                                                                                                                                                                                                                               The Bombardment of Papeete occurred in French Polynesia when German warships attacked on 22 September 1914, during World War I. The German armoured cruisers SMS Scharnhorst and Gneisenau entered the port of Papeete on the island of Tahiti and sank the French gunboat ZÃ©lÃ©e and freighter WalkÃ¼re before bombarding the town&#39;s fortifications. French shore batteries and a gunboat resisted the German intrusion but were greatly outgunned. The main German objective was to seize the coal piles stored on the island, but these were destroyed by the French at the start of the action. The German vessels were largely undamaged but the French lost their gunboat. Several of Papeete&#39;s buildings were destroyed and the town&#39;s economy was severely disrupted. The main strategic consequence of the engagement was the disclosure of the cruisers&#39; positions to the British Admiralty, which led to the Battle of Coronel where the entire German East Asia Squadron defeated a Royal Navy squadron. The depletion of Scharnhorst&#39;s and Gneisenau&#39;s ammunition at Papeete also contributed to their subsequent destruction at the Battle of the Falklands.
-## 3 The Battle of Bita Paka (11 September 1914) was fought south of Kabakaul, on the island of New Britain, and was a part of the invasion and subsequent occupation of German New Guinea by the Australian Naval and Military Expeditionary Force (AN&amp;MEF) shortly after the outbreak of the First World War. Similar to New Zealand&#39;s operation against German Samoa in August, the main target of the operation was a strategically important wireless stationâ€”one of several used by the German East Asiatic Squadronâ€”which the Australians believed to be located in the area. The powerful German naval fleet threatened British interests and its elimination was an early priority of the British and Australian governments during the war. After an unopposed landing, a mixed force of German reservists and half-trained Melanesian police mounted a stout resistance and forced the Australians to fight their way to the objective. After a day of fighting during which both sides suffered casualties, Australian forces captured the wireless station at Bita Paka. The battle was Australia&#39;s first major military engagement of the war and the only significant action of the campaign; in its aftermath the remaining German forces on New Britain fled inland to Toma. Following a brief siege there the German garrison capitulated, ending resistance to the Australian occupation of the island.</code></pre>
-<pre class="r"><code>write.csv(Asian_and_Pacific_theatre_of_World_War_I,file=&#39;Asian_and_Pacific_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
+<pre class="r"><code># Asian_and_Pacific_theatre_of_World_War_I &lt;- create_front_battle_df(&quot;http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I&quot;)
+# dim(Asian_and_Pacific_theatre_of_World_War_I)
+# head(Asian_and_Pacific_theatre_of_World_War_I, 3)
+# write.csv(Asian_and_Pacific_theatre_of_World_War_I,file=&#39;Asian_and_Pacific_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 <div id="all-world" class="section level3">
 <h3>All world</h3>
-<pre class="r"><code>all_battles &lt;- rbind(western_front, Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
-head(all_battles, 3)</code></pre>
-<pre><code>##       lat    long                              causalties date
-## 1   50.89   2.922 Over 75% of Canadians killed or wounded 1915
-## 2 50.4583 2.79417                                  59,247 1915
-## 3 50.7625 2.89528                                  24,562 1917
-##                         name
-## 1 Battle of Kitcheners&#39; Wood
-## 2             Battle of Loos
-## 3         Battle of Messines
-##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      desc
-## 1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         The Battle of Kitcheners&#39; Wood was fought during World War I during the Second Battle of Ypres.
-## 2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     The Battle of Loos took place from 25 September to 8 October 1915 in France on the Western Front, during the First World War. It was the biggest British attack of 1915, the first time that the British used poison gas and the first mass engagement of New Army units. The French and British tried to break through the German defences in Artois and Champagne and restore a war of movement. Despite improved methods, more ammunition and better equipment, the Franco-British attacks were largely contained by the Germans, except for local losses of ground. The British gas attack failed to neutralize the defenders and the artillery bombardment was too short to destroy the barbed wire or machine gun nests. German tactical defensive proficiency was still dramatically superior to the British offensive planning and doctrine, resulting in a British defeat.
-## 3 The Battle of Messines (7â€“14 June 1917) was an attack by the British Second Army (General Sir Herbert Plumer), on the Western Front, near the village of Messines (now Mesen) in West Flanders, Belgium, during the First World War. The Nivelle Offensive in April and May had failed to achieve its more grandiose aims, had led to the demoralisation of French troops and confounded the Anglo-French strategy for 1917. The attack forced the Germans to move reserves to Flanders from the Arras and Aisne fronts, relieving pressure on the French. The British tactical objective was to capture the German defences on the ridge, which ran from Ploegsteert Wood (Plugstreet to the British) in the south, through Messines and Wytschaete to Mt Sorrel, depriving the German 4th Army of the high ground. The ridge gave commanding views of the British defences and back areas of Ypres to the north, from which the British intended to conduct the Northern Operation, an advance to Passchendaele Ridge and then the capture of the Belgian coast up to the Dutch frontier. The Second Army had five corps, three for the attack and two on the northern flank not part of the operation; XIV Corps was in General Headquarters reserve. The 4th Army divisions of Group Wytschaete (Gruppe Wijtschate, the IX Reserve Corps headquarters) held the ridge and were later reinforced by a division from Group Ypres (Gruppe Ypern). The British attacked with the II Anzac Corps (3rd Australian Division, New Zealand Division and the 25th Division, with the 4th Australian Division in reserve), IX Corps (36th (Ulster), 16th (Irish) and 19th (Western) divisions and the 11th (Northern) Division in reserve), X Corps (41st, 47th (1/2nd London) and 23rd Divisions with the 24th Division in reserve). XIV Corps in reserve (Guards, 1st, 8th and 32nd divisions). The 30th, 55th (West Lancashire), 39th and 38th (Welsh) divisions in II Corps and VIII Corps, guarded the northern flank and made probing attacks on 8 June. Gruppe Wijtschate held the ridge with the 204th, 35th, 2nd, 3rd Bavarian (relieving the 40th Division when the British attack began) and 4th Bavarian divisions, with the 7th Division and 1st Guard Reserve Division as Eingreif (counter-attack) divisions. The 24th Saxon Division, relieved on 5 June, was rushed back when the attack began and the 11th Division, in Gruppe Ypern reserve, arrived on 8 June. The battle began with the detonation of 19 mines beneath the German front position, which devastated it and left large craters. A creeping barrage, 700 yd (640 m) deep, began and protected the British troops as they secured the ridge with support from tanks, cavalry patrols and aircraft. The effect of the British mines, barrages and bombardments was improved by advances in artillery survey, flash spotting and centralised control of artillery from the Second Army headquarters. British attacks from 8 to 14 June advanced the front line beyond the former German Sehnenstellung (Chord Position, the Oosttaverne Line to the British). The battle was a prelude to the much larger Third Battle of Ypres, the preliminary bombardment for which began on 11 July 1917.</code></pre>
-<pre class="r"><code>write.csv(df,file=&#39;all_battles_WWI.csv&#39;, row.names=FALSE)</code></pre>
+<pre class="r"><code># all_battles &lt;- rbind(western_front, Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
+# head(all_battles, 3)
+# write.csv(df,file=&#39;all_battles_WWI.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 </div>
 

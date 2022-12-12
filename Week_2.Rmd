@@ -69,6 +69,7 @@ qd <- SPARQL(endpoint,query)
 df <- qd$results
 df
 ```
+
 ```{r}
 cleaning_and_concatenate_result <- function(df) {
   

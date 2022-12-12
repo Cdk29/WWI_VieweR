@@ -3,16 +3,26 @@ library(leaflet)
 library(shinythemes)
 library(plotly)
 
+choices_list_year <- list("1914" = 1914, 
+                          "1915" = 1915, 
+                          "1916" = 1916,
+                          "1917" = 1917,
+                          "1918" = 1918)
+
 navbarPage(theme = shinytheme("sandstone"),
            "WWI VieweR", id="main",
-           tabPanel("European theatre of World War I", leafletOutput("wwmap", height=3000),
+           tabPanel("European theatre of World War I", leafletOutput("European_map", height=3000),
                     tags$head(includeCSS("style.css")),
                     absolutePanel(id = "controls", class = "panel panel-default", 
                                   top = 75, left = 55, width = 350, fixed=TRUE,
                                   draggable = TRUE, height = "auto",
                                   
-                                  span(tags$i(h6()), style="color:#045a8d")#,
-                                  # h3(textOutput("reactive_case_count"), align = "right"),
+                                  span(tags$i(h6()), style="color:#045a8d"),
+                                  #column(3,
+                                  h4(checkboxGroupInput("year", 
+                                                            h3("Checkbox group"), 
+                                                            choices = choices_list_year,
+                                                            selected = choices_list_year))
                                   # h4(textOutput("reactive_death_count"), align = "right"),
                                   # h6(textOutput("clean_date_reactive"), align = "right"),
                                   # h6(textOutput("reactive_country_count"), align = "right"),

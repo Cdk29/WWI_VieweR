@@ -12,12 +12,12 @@ library(stringr)
 library(utils)
 library(digest)
 # https://stackoverflow.com/questions/21686645/how-to-create-md5-hash-of-a-column-in-r
-
-
-shinyServer(function(input, output) {
-  # Import Data 
+# Import Data 
   
-  ww_data <- read.csv("European_theatre_of_World_War_I.csv", stringsAsFactors = FALSE )
+  ## A refactor en fonction
+load_battles <- function(csv_file) {
+  
+  ww_data <- read.csv(csv_file, stringsAsFactors = FALSE )
 
   ww_data <- mutate(ww_data, on_click=paste0(paste0('<img src=',
                                                     depiction,
@@ -30,6 +30,11 @@ shinyServer(function(input, output) {
                                             '<br><strong> Description: </strong>', desc,
                                             '<br><strong>causalties :</strong> ', causalties))
 
+  return(ww_data)
+}
+
+
+shinyServer(function(input, output) {
 
   # create a color paletter for category type in the data file
   # pal <- palette_OkabeIto[c(5,1)] 
@@ -44,10 +49,14 @@ shinyServer(function(input, output) {
   # output$reactive_death_count <- renderText({
   #   paste0("Consommation estimé : ", max(electricity$value), " MW")
   # })
-
-  output$wwmap <- renderLeaflet({
-      leaflet(ww_data) %>%
-      addTiles() %>%
-      addMarkers(data = ww_data, lat =  ~lat, lng =~long, popup = ~on_click)}) 
+  
+  European_theatre  <- load_battles("European_theatre_of_World_War_I.csv")
+  
+ # European_theatre <- reactive(European_theatre %>% filter(date %in% input$year))
+  output$European_map <- renderLeaflet({
+    European_theatre %>% filter(date %in% input$year) %>% 
+    leaflet() %>%
+      addTiles() %>% #setView(mean(European_theatre$long), mean(European_theatre$lat), zoom =7) %>% 
+      addMarkers(lat =  ~lat, lng =~long, popup = ~on_click)}) 
 
 })
