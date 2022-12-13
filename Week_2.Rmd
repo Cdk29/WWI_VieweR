@@ -53,7 +53,7 @@ library(SPARQL)
 endpoint <- "https://dbpedia.org/sparql/"
 
 query <-
-'select ?lat ?long ?causalties year(?date) as ?date ?name ?campaign ?desc where { 
+'select ?lat ?long ?causalties year(?date) as ?year month(?date) as ?month day(?date) as ?day ?name ?campaign ?desc where { 
   <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
   <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:causalties ?causalties .
@@ -137,7 +137,7 @@ got_data_dbpedia <- function(url) {
  endpoint <- "https://dbpedia.org/sparql/"
 
   query <-
-'select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?date ?name ?desc where { 
+'select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?year month(?date) as ?month day(?date) as ?day ?name ?result ?desc where { 
   <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
   <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:strength ?strength .
@@ -146,6 +146,7 @@ got_data_dbpedia <- function(url) {
   <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:depiction	?depiction .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:date ?date .
   <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:name ?name .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:result ?result .
   <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:abstract ?desc .
   FILTER (langMatches(lang(?desc),"en"))
 }'

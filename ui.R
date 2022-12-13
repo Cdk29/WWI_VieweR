@@ -19,10 +19,12 @@ navbarPage(theme = shinytheme("sandstone"),
                                   
                                   span(tags$i(h6()), style="color:#045a8d"),
                                   #column(3,
-                                  h4(checkboxGroupInput("year", 
-                                                            h3("Checkbox group"), 
-                                                            choices = choices_list_year,
-                                                            selected = choices_list_year))
+                                  sliderInput("sliderInputdate",
+                                                "Dates:",
+                                                min = as.Date("1914-01-01","%Y-%m-%d"),
+                                                max = as.Date("1918-12-01","%Y-%m-%d"),
+                                                value=c(as.Date("1914-01-01","%Y-%m-%d"),
+                                                        as.Date("1918-12-01","%Y-%m-%d")))
                                   # h4(textOutput("reactive_death_count"), align = "right"),
                                   # h6(textOutput("clean_date_reactive"), align = "right"),
                                   # h6(textOutput("reactive_country_count"), align = "right"),

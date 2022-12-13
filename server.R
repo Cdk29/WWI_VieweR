@@ -13,12 +13,34 @@ library(utils)
 library(digest)
 # https://stackoverflow.com/questions/21686645/how-to-create-md5-hash-of-a-column-in-r
 # Import Data 
-  
-  ## A refactor en fonction
+
+getColor <- function(ww_data) {
+  lapply(ww_data$result, function(result) {
+    if(grepl(pattern= "British|Italian|French|Belgian|Allied|Canadian", result)) {
+      "blue"
+    }  else if (grepl(pattern= "German|Entente|Austro|Bulgarian", result)) {
+      "black"
+    } else {
+      "orange"
+    } })
+}
+
+getColor_icon <- function(ww_data) {
+  lapply(ww_data$result, function(result) {
+    if(grepl(pattern= "British|Italian|French|Belgian|Allied|Canadian", result)) {
+      "black"
+    }  else if (grepl(pattern= "German|Entente|Austro|Bulgarian", result)) {
+      "white"
+    } else {
+      "purple"
+    } })
+}
+
 load_battles <- function(csv_file) {
   
   ww_data <- read.csv(csv_file, stringsAsFactors = FALSE )
-
+  #ww_data$date <- paste0(ww_data$day, "/", ww_data$month, "/", ww_data$year)
+  ww_data$date <- paste0(ww_data$year, "-", ww_data$month, "-", ww_data$day)
   ww_data <- mutate(ww_data, on_click=paste0(paste0('<img src=',
                                                     depiction,
                                                     # 'alt="no longer stolen from wikipedia"',
@@ -26,6 +48,7 @@ load_battles <- function(csv_file) {
                                                     '>'),
                                             #'<br><strong>depiction: </strong> ', URLencode(depiction),
                                             '<br><strong>Name: </strong> ', name,
+                                            '<br><strong>Results: </strong> ', result,
                                             '<br><strong>Date: </strong> ', date,
                                             '<br><strong> Description: </strong>', desc,
                                             '<br><strong>causalties :</strong> ', causalties))
@@ -33,30 +56,27 @@ load_battles <- function(csv_file) {
   return(ww_data)
 }
 
+pal <- colorFactor(pal = c("blue", "black", "orange"), domain = c("Allied Victory", "Uknown", "Entente Victory"))
 
 shinyServer(function(input, output) {
 
-  # create a color paletter for category type in the data file
-  # pal <- palette_OkabeIto[c(5,1)] 
-  
-  # pal <- c("#6778A5", "#ECBF93")
-  # pal <- colorFactor(pal = pal, domain = c("Eolienne", "Panneau solaire"))
-
-  # output$reactive_case_count <- renderText({
-  #   paste0("Production éolienne estimé : ", max(production$value), " MW")
-  # })
-  # 
-  # output$reactive_death_count <- renderText({
-  #   paste0("Consommation estimé : ", max(electricity$value), " MW")
-  # })
-  
   European_theatre  <- load_battles("European_theatre_of_World_War_I.csv")
   
  # European_theatre <- reactive(European_theatre %>% filter(date %in% input$year))
   output$European_map <- renderLeaflet({
-    European_theatre %>% filter(date %in% input$year) %>% 
-    leaflet() %>%
+    #filter(between(date_column, as.Date('2022-01-20'), as.Date('2022-02-20')))
+    European_theatre <- European_theatre %>% filter(between(as.Date(date), as.Date(input$sliderInputdate[1]), as.Date(input$sliderInputdate[2]))) #%>% 
+    icons <- awesomeIcons(
+      icon = 'ios-close',
+      iconColor = unlist(getColor_icon(European_theatre)),
+      library = 'ion',
+      markerColor = unlist(getColor(European_theatre))
+    )
+    European_theatre %>% leaflet() %>%
       addTiles() %>% #setView(mean(European_theatre$long), mean(European_theatre$lat), zoom =7) %>% 
-      addMarkers(lat =  ~lat, lng =~long, popup = ~on_click)}) 
+      addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click, 
+                        icon = icons, label=~as.character(name)) %>%  
+      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+    }) 
 
 })

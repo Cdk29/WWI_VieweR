@@ -221,7 +221,7 @@ battles &lt;- read_csv(&quot;battles.csv&quot;)</code></pre>
 <pre class="r"><code>endpoint &lt;- &quot;https://dbpedia.org/sparql/&quot;
 
 query &lt;-
-&#39;select ?lat ?long ?causalties year(?date) as ?date ?name ?campaign ?desc where { 
+&#39;select ?lat ?long ?causalties year(?date) as ?year month(?date) as ?month day(?date) as ?day ?name ?campaign ?desc where { 
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; geo:lat ?lat .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; geo:long ?long .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:causalties ?causalties .
@@ -236,9 +236,9 @@ query &lt;- str_replace_all(query, &quot;http://dbpedia.org/resource/Battle_of_L
 qd &lt;- SPARQL(endpoint,query)
 df &lt;- qd$results
 df</code></pre>
-<pre><code>##     lat  long  causalties date                    name
-## 1 30.89 34.02     22 dead 1916 &quot;Battle of Magdhaba&quot;@en
-## 2 30.89 34.02 124 wounded 1916 &quot;Battle of Magdhaba&quot;@en
+<pre><code>##     lat  long  causalties year month day                    name
+## 1 30.89 34.02     22 dead 1916    12  23 &quot;Battle of Magdhaba&quot;@en
+## 2 30.89 34.02 124 wounded 1916    12  23 &quot;Battle of Magdhaba&quot;@en
 ##                                                              campaign
 ## 1 &lt;http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I&gt;
 ## 2 &lt;http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I&gt;
@@ -300,7 +300,7 @@ digest(&quot;Camel_corps_at_Magdhaba.jpg&quot;, algo=&quot;md5&quot;, serialize=
  endpoint &lt;- &quot;https://dbpedia.org/sparql/&quot;
 
   query &lt;-
-&#39;select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?date ?name ?desc where { 
+&#39;select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?year month(?date) as ?month day(?date) as ?day ?name ?result ?desc where { 
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; geo:lat ?lat .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; geo:long ?long .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:strength ?strength .
@@ -309,6 +309,7 @@ digest(&quot;Camel_corps_at_Magdhaba.jpg&quot;, algo=&quot;md5&quot;, serialize=
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; foaf:depiction   ?depiction .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:date ?date .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; foaf:name ?name .
+  &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:result ?result .
   &lt;http://dbpedia.org/resource/Battle_of_Lorraine&gt; dbo:abstract ?desc .
   FILTER (langMatches(lang(?desc),&quot;en&quot;))
 }&#39;
@@ -333,8 +334,8 @@ digest(&quot;Camel_corps_at_Magdhaba.jpg&quot;, algo=&quot;md5&quot;, serialize=
 ## 1 Middle_Eastern_theatre_of_World_War_I
 ##                                                                         depiction
 ## 1 https://upload.wikimedia.org/wikipedia/commons/d/dd/Camel_corps_at_Magdhaba.jpg
-##   date               name
-## 1 1916 Battle of Magdhaba
+##   year month day               name          result
+## 1 1916    12  23 Battle of Magdhaba British victory
 ##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          desc
 ## 1 The Battle of Magdhaba took place on 23 December 1916 during the Defence of Egypt section of the Sinai and Palestine Campaign in the First World War. The attack by the Anzac Mounted Division took place against an entrenched Ottoman Army garrison to the south and east of Bir Lahfan in the Sinai desert, some 18-25 miles (29-40 km) inland from the Mediterranean coast. This Egyptian Expeditionary Force (EEF) victory against the Ottoman Empire garrison also secured the town of El Arish after the Ottoman garrison withdrew. In August 1916, a combined Ottoman and German Empire army had been forced to retreat to Bir el Abd, after the British victory in the Battle of Romani. During the following three months the defeated force retired further eastwards to El Arish, while the captured territory stretching from the Suez Canal was consolidated and garrisoned by the EEF. Patrols and reconnaissances were carried out by British forces, to protect the continuing construction of the railway and water pipeline and to deny passage across the Sinai desert to the Ottoman forces by destroying water cisterns and wells. By December 1916, construction of the infrastructure and supply lines had sufficiently progressed to enable the British advance to recommence, during the evening of 20 December. By the following morning a mounted force had reached El Arish to find it abandoned. An Ottoman Army garrison in a strong defensive position was located at Magdhaba, some 18-30 miles (29-48 km) inland to the south east, on the Wadi el Arish. After a second night march by the Anzac Mounted Division (Australian and New Zealand Mounted Division), the attack on Magdhaba was launched by Australian, British and New Zealand troops against well-entrenched Ottoman forces defending a series of six redoubts. During the day&#39;s fierce fighting, the mounted infantry tactics of riding as close to the front line as possible and then dismounting to make their attack with the bayonet supported by artillery and machine guns prevailed, assisted by aircraft reconnaissances. All of the well-camouflaged redoubts were eventually located and captured and the Ottoman defenders surrendered in the late afternoon.</code></pre>
 </div>
@@ -360,8 +361,8 @@ got_data_dbpedia(url)</code></pre>
 ## 1 Middle_Eastern_theatre_of_World_War_I
 ##                                                                         depiction
 ## 1 https://upload.wikimedia.org/wikipedia/commons/d/dd/Camel_corps_at_Magdhaba.jpg
-##   date               name
-## 1 1916 Battle of Magdhaba
+##   year month day               name          result
+## 1 1916    12  23 Battle of Magdhaba British victory
 ##                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          desc
 ## 1 The Battle of Magdhaba took place on 23 December 1916 during the Defence of Egypt section of the Sinai and Palestine Campaign in the First World War. The attack by the Anzac Mounted Division took place against an entrenched Ottoman Army garrison to the south and east of Bir Lahfan in the Sinai desert, some 18-25 miles (29-40 km) inland from the Mediterranean coast. This Egyptian Expeditionary Force (EEF) victory against the Ottoman Empire garrison also secured the town of El Arish after the Ottoman garrison withdrew. In August 1916, a combined Ottoman and German Empire army had been forced to retreat to Bir el Abd, after the British victory in the Battle of Romani. During the following three months the defeated force retired further eastwards to El Arish, while the captured territory stretching from the Suez Canal was consolidated and garrisoned by the EEF. Patrols and reconnaissances were carried out by British forces, to protect the continuing construction of the railway and water pipeline and to deny passage across the Sinai desert to the Ottoman forces by destroying water cisterns and wells. By December 1916, construction of the infrastructure and supply lines had sufficiently progressed to enable the British advance to recommence, during the evening of 20 December. By the following morning a mounted force had reached El Arish to find it abandoned. An Ottoman Army garrison in a strong defensive position was located at Magdhaba, some 18-30 miles (29-48 km) inland to the south east, on the Wadi el Arish. After a second night march by the Anzac Mounted Division (Australian and New Zealand Mounted Division), the attack on Magdhaba was launched by Australian, British and New Zealand troops against well-entrenched Ottoman forces defending a series of six redoubts. During the day&#39;s fierce fighting, the mounted infantry tactics of riding as close to the front line as possible and then dismounting to make their attack with the bayonet supported by artillery and machine guns prevailed, assisted by aircraft reconnaissances. All of the well-camouflaged redoubts were eventually located and captured and the Ottoman defenders surrendered in the late afternoon.</code></pre>
 <p>Edit while coding : the recursion add up for 100 battles. See the Recursion entry below.</p>
@@ -2458,6 +2459,14 @@ for (battles in vector_battles) {
 ## StartTag: invalid element name
 ## StartTag: invalid element name
 ## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
+## StartTag: invalid element name
 ## Error : 1: StartTag: invalid element name
 ## 2: StartTag: invalid element name
 ## 3: StartTag: invalid element name
@@ -2466,6 +2475,14 @@ for (battles in vector_battles) {
 ## 6: StartTag: invalid element name
 ## 7: StartTag: invalid element name
 ## 8: StartTag: invalid element name
+## 9: StartTag: invalid element name
+## 10: StartTag: invalid element name
+## 11: StartTag: invalid element name
+## 12: StartTag: invalid element name
+## 13: StartTag: invalid element name
+## 14: StartTag: invalid element name
+## 15: StartTag: invalid element name
+## 16: StartTag: invalid element name
 ## 
 ## StartTag: invalid element name
 ## StartTag: invalid element name
@@ -2534,7 +2551,7 @@ for (battles in vector_battles) {
 ## 29: StartTag: invalid element name
 ## 30: StartTag: invalid element name</code></pre>
 <pre class="r"><code>dim(European_theatre_of_World_War_I)</code></pre>
-<pre><code>## [1] 117   9</code></pre>
+<pre><code>## [1] 117  12</code></pre>
 <pre class="r"><code>head(European_theatre_of_World_War_I[1:8], 3)</code></pre>
 <pre><code>##       lat    long
 ## 1   50.89   2.922
@@ -2556,10 +2573,10 @@ for (battles in vector_battles) {
 ## 1                                     https://upload.wikimedia.org/wikipedia/commons/9/96/Kitcheners&#39;_Wood.jpg
 ## 2 https://upload.wikimedia.org/wikipedia/commons/7/7a/British_infantry_advancing_at_Loos_25_September_1915.jpg
 ## 3                                       https://upload.wikimedia.org/wikipedia/commons/1/18/Mesen_-_City_1.jpg
-##   date                       name
-## 1 1915 Battle of Kitcheners&#39; Wood
-## 2 1915             Battle of Loos
-## 3 1917         Battle of Messines</code></pre>
+##   year month
+## 1 1915     4
+## 2 1915    10
+## 3 1917     6</code></pre>
 <pre class="r"><code>write.csv(European_theatre_of_World_War_I,file=&#39;European_theatre_of_World_War_I.csv&#39;, row.names=FALSE)</code></pre>
 </div>
 <div id="asia" class="section level3">
