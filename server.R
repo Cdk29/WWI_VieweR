@@ -41,6 +41,7 @@ load_battles <- function(csv_file) {
   ww_data <- read.csv(csv_file, stringsAsFactors = FALSE )
   #ww_data$date <- paste0(ww_data$day, "/", ww_data$month, "/", ww_data$year)
   ww_data$date <- paste0(ww_data$year, "-", ww_data$month, "-", ww_data$day)
+  # ww_data$campaign <- str_replace_all(ww_data$campaign)
   ww_data <- mutate(ww_data, on_click=paste0(paste0('<img src=',
                                                     depiction,
                                                     # 'alt="no longer stolen from wikipedia"',
@@ -62,10 +63,14 @@ shinyServer(function(input, output) {
 
   European_theatre  <- load_battles("European_theatre_of_World_War_I.csv")
   
- # European_theatre <- reactive(European_theatre %>% filter(date %in% input$year))
+  
   output$European_map <- renderLeaflet({
-    #filter(between(date_column, as.Date('2022-01-20'), as.Date('2022-02-20')))
+
+    src = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Canadian_tank_and_soldiers_Vimy_1917.jpg/300px-Canadian_tank_and_soldiers_Vimy_1917.jpg"
+    output$image<-renderText({c('<img src="',src,'">')})
+    
     European_theatre <- European_theatre %>% filter(between(as.Date(date), as.Date(input$sliderInputdate[1]), as.Date(input$sliderInputdate[2]))) #%>% 
+    European_theatre <- European_theatre[grepl(x = European_theatre$campaign, pattern = paste(input$CampaignInput, collapse = "|")),]
     icons <- awesomeIcons(
       icon = 'ios-close',
       iconColor = unlist(getColor_icon(European_theatre)),
@@ -73,10 +78,11 @@ shinyServer(function(input, output) {
       markerColor = unlist(getColor(European_theatre))
     )
     European_theatre %>% leaflet() %>%
-      addTiles() %>% #setView(mean(European_theatre$long), mean(European_theatre$lat), zoom =7) %>% 
+      addTiles() %>% setView(mean(European_theatre$long), mean(European_theatre$lat), zoom =7) %>% 
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click, 
                         icon = icons, label=~as.character(name)) %>%  
       addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
     }) 
 
 })
+
