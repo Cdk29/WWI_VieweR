@@ -1,0 +1,277 @@
+---
+title: "Data Review"
+author: "Etienne Rolland"
+date: "11/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+#####Make sure you load any required packages.
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Import Your Data
+
+*In the following code hunk, import your data.*
+
+**Update :** one problem appear with the CDB90 Battle Dataset I originally choose to use. I needed to do additionnal scrapping, using the url in the battles.csv, to query additionnal data (latitude, longitude, etc). Sadly, the dataset is slightly old, and the links towards the resources of dbpedia were not the same as before. Hence, the query via SPARQL were not valid. Finally, I will just create the dataset using queries to the website.
+
+I am loading the battles.csv, just to got the name of the fronts, to be sure to not forget something in the subsequent queries.
+
+
+```{r data_import, warning=FALSE}
+
+#### Use read_csv() or another function
+
+#### Make sure your data is converted into a tibble. 
+
+#### For demonstration purposes, this example uses the mtcars data.
+library(utils)
+
+library(readr)
+battles <- read_csv("battles.csv")
+battles <- battles[grep(battles$cow_warname, pattern="World War I of 1914-1918"),]
+```
+
+```{r}
+unique(battles$war)
+```
+## Scrapping
+
+### Testing queries
+
+If you are wondering what the hell is SPARQL, it is [here](https://www.r-bloggers.com/2013/01/sparql-with-r-in-less-than-5-minutes/).
+
+```{r}
+library(SPARQL)
+```
+
+```{r}
+endpoint <- "https://dbpedia.org/sparql/"
+
+query <-
+'select ?lat ?long ?causalties year(?date) as ?year month(?date) as ?month day(?date) as ?day ?name ?campaign ?desc where { 
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:causalties ?causalties .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:date ?date .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:name ?name .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:isPartOfMilitaryConflict ?campaign .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:abstract ?desc .
+  FILTER (langMatches(lang(?desc),"en"))
+}'
+
+query <- str_replace_all(query, "http://dbpedia.org/resource/Battle_of_Lorraine", "http://dbpedia.org/resource/Battle_of_Magdhaba")
+qd <- SPARQL(endpoint,query)
+df <- qd$results
+df
+```
+
+```{r}
+cleaning_and_concatenate_result <- function(df) {
+  
+df_concatenated <- df[1,]
+
+for (column in colnames(df)) {
+  if (column == "depiction") { # une seule image
+    df_concatenated[column] <- df[1,]$depiction
+    next
+  }
+  content <- df[column]
+  content <- unique(content)
+  content <- paste(content, sep = ", ")
+  
+  content <- str_replace_all(string=content, pattern = "c\\(", replacement = "")
+  content <- str_replace_all(string=content, pattern = '\\"', replacement = "")
+  content <- str_replace_all(string=content, pattern = '\\)$', replacement = "")
+  content <- str_replace_all(string=content, pattern = '@en', replacement = "")
+  df_concatenated[column] <- content
+}
+return(df_concatenated)
+}
+
+```
+
+```{r}
+library(digest)
+# https://stackoverflow.com/questions/33689980/get-thumbnail-image-from-wikimedia-commons
+digest("Camel_corps_at_Magdhaba.jpg", algo="md5", serialize=F)
+```
+
+```{r}
+clean_url_image <- function(depiction) {
+  # the image inside dbpedia is a relative/redirection path inside wiki commons
+  # we need the exact url for printing inside a shiny app
+
+  #depiction <- "<http://commons.wikimedia.org/wiki/Special:FilePath/Camel_corps_at_Magdhaba.jpg>"
+  depiction  <- str_replace_all(depiction ,"<|>", "")
+  img_name <- unlist(str_split(depiction, "/"))
+  img_name <- tail(img_name, n=1) #last one
+  
+  hash <- digest(img_name, algo="md5", serialize=F)
+  # hash
+  # new column for the popup label
+  depiction <- paste0("https://upload.wikimedia.org/wikipedia/commons/", 
+                      substr(hash, 1, 1), # first character
+                      "/",
+                      substr(hash, 1, 2),
+                      "/",
+                      URLencode(img_name))
+  return(depiction)
+}
+```
+
+```{r}
+clean_url_image("<http://commons.wikimedia.org/wiki/Special:FilePath/Camel_corps_at_Magdhaba.jpg>")
+```
+
+
+### Scrapping for real
+
+```{r}
+got_data_dbpedia <- function(url) {
+  
+ endpoint <- "https://dbpedia.org/sparql/"
+
+  query <-
+'select ?lat ?long ?strength ?causalties ?campaign ?depiction year(?date) as ?year month(?date) as ?month day(?date) as ?day ?name ?result ?desc where { 
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:lat ?lat .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> geo:long ?long .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:strength ?strength .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:causalties ?causalties .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:isPartOfMilitaryConflict	?campaign .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:depiction	?depiction .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:date ?date .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> foaf:name ?name .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:result ?result .
+  <http://dbpedia.org/resource/Battle_of_Lorraine> dbo:abstract ?desc .
+  FILTER (langMatches(lang(?desc),"en"))
+}'
+
+  query <- str_replace_all(query, "http://dbpedia.org/resource/Battle_of_Lorraine", url)
+  qd <- SPARQL(endpoint,query)
+  df <- qd$results
+  df <- cleaning_and_concatenate_result(df)
+  df$depiction <- clean_url_image(df$depiction)
+  df$desc <- str_replace_all(df$desc, "â€“", "-")
+  df$name <- iconv(df$name , from="UTF-8", to="LATIN1")
+  df$desc <- iconv(df$desc , from="UTF-8", to="LATIN1")
+  df$campaign <- str_replace_all(df$campaign , "<|>", "")
+  df$campaign <- str_replace_all(df$campaign , "http://dbpedia.org/resource/", "")
+  return(df)
+}
+
+```
+
+```{r}
+url <- "http://dbpedia.org/resource/Battle_of_Magdhaba"
+```
+
+
+```{r}
+got_data_dbpedia(url)
+```
+
+### Politely 
+
+See : [the polite package](https://dmi3kno.github.io/polite/index.html).
+
+```{r}
+library(polite)
+got_data_dbpedia <- politely(got_data_dbpedia, verbose=TRUE) 
+
+```
+
+
+```{r}
+# url <- "http://dbpedia.org/resource/Battle_of_Lorraine"
+got_data_dbpedia(url)
+```
+
+Edit while coding : the recursion add up for 100 battles.
+See the Recursion entry below.
+
+```{r}
+got_battles_for_front <- function(url) {
+
+endpoint <- "https://dbpedia.org/sparql/"
+
+query <-
+'select ?battle where { 
+  ?battle dbo:isPartOfMilitaryConflict <balise_to_change>
+}'
+
+query <- str_replace_all(query, "balise_to_change", url)
+qd <- SPARQL(endpoint,query)
+df <- qd$results
+vector_battles <- as.vector(unlist(df))
+vector_battles <- iconv(vector_battles, from="UTF-8", to="LATIN1")
+vector_battles <- str_replace_all(vector_battles, "<|>", "")
+
+# recursion ?
+for (url in vector_battles) {
+  vector_battles <- c(vector_battles, try(got_battles_for_front(url)))
+}
+
+
+return(vector_battles[grepl(vector_battles, pattern="http")])
+
+}
+
+got_battles_for_front <- politely(got_battles_for_front, verbose=TRUE) 
+```
+
+
+```{r}
+create_front_battle_df <- function(url_front) {
+  
+    vector_battles <- got_battles_for_front(url_front)
+
+    #vector_battles <- head(vector_battles)
+    
+
+    list_battles_df<-list()
+    i <- 0
+    for (battles in vector_battles) {
+      i <- i + 1
+      list_battles_df[[i]] <- try(got_data_dbpedia(battles))
+    }
+    
+    list_battles_df <- list_battles_df[sapply(list_battles_df, class) == "data.frame"]
+    list_battles_df <- do.call(rbind, list_battles_df)
+    
+    return(list_battles_df)
+
+}
+
+```
+
+### Recursion
+
+Some front are nested inside battles, see for example :
+
+Gallipoli_campaign is queried from inside https://dbpedia.org/page/Middle_Eastern_theatre_of_World_War_I.
+
+Edit : after some refactoring, the recursion must go inside got_battles_for_front
+
+```{r message=FALSE, warning=FALSE}
+#head(got_data_dbpedia("http://dbpedia.org/resource/Gallipoli_campaign"))
+```
+
+```{r message=FALSE, warning=FALSE}
+#got_battles_for_front("http://dbpedia.org/resource/Gallipoli_campaign")
+```
+
+
+## Scrapping
+
+```{r message=FALSE, warning=FALSE}
+WWI <- create_front_battle_df("http://dbpedia.org/resource/World_War_I")
+dim(WWI)
+write.csv(WWI, file='WWI_all_battles.csv', row.names=FALSE)
+
+```
+
