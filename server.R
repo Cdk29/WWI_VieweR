@@ -46,6 +46,9 @@ load_battles <- function(csv_file) {
   
   ww_data <- read.csv(csv_file, stringsAsFactors = FALSE )
   #ww_data$date <- paste0(ww_data$day, "/", ww_data$month, "/", ww_data$year)
+  ww_data$year <- str_extract(ww_data$year, "^[0-9][0-9][0-9][0-9]")
+  ww_data$month <- str_extract(ww_data$month, "^[0-9]+")
+  ww_data$day <- str_extract(ww_data$day, "^[0-9]+")
   ww_data$date <- paste0(ww_data$year, "-", ww_data$month, "-", ww_data$day)
   # ww_data$campaign <- str_replace_all(ww_data$campaign)
   ww_data <- mutate(ww_data, on_click=paste0(paste0('<img src=',
@@ -91,6 +94,12 @@ shinyServer(function(input, output) {
   
   src_asia = "http://commons.wikimedia.org/wiki/Special:FilePath/Bundesarchiv_Bild_134-C1299,_Tsingtau,_Vorderste_deutsche_Frontlinie.jpg?width=300"
   output$Asian_and_Pacific_theatre_img <- renderText({c('<img src="',src_asia, '">')})
+  
+  global_theatre_of_World_War_I  <- load_battles("WWI_all_battles.csv")
+
+  src_wwi = 'http://commons.wikimedia.org/wiki/Special:FilePath/WWImontage.jpg?width=300'
+  output$global_theatre_img <- renderText({c('<img src="', src_wwi, '">')})
+
   
   output$European_map <- renderLeaflet({
     
@@ -159,6 +168,25 @@ shinyServer(function(input, output) {
                         icon = icons, label=~as.character(name)) %>%
       addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
   })
+  
+  output$global_map <- renderLeaflet({
+
+    global_theatre_of_World_War_I <- global_theatre_of_World_War_I %>% filter(between(as.Date(date), as.Date(input$sliderInputdate_global[1]), as.Date(input$sliderInputdate_global[2]))) #%>%
+    global_theatre_of_World_War_I <- global_theatre_of_World_War_I[grepl(x = global_theatre_of_World_War_I$campaign, pattern = paste(input$CampaignInput_global, collapse = "|")),]
+    icons <- awesomeIcons(
+      icon = 'ios-close',
+      iconColor = unlist(getColor_icon(global_theatre_of_World_War_I)),
+      library = 'ion',
+      markerColor = unlist(getColor(global_theatre_of_World_War_I))
+    )
+    global_theatre_of_World_War_I %>% leaflet() %>%
+      addTiles() %>% setView(mean(global_theatre_of_World_War_I$long), mean(global_theatre_of_World_War_I$lat), zoom =7) %>%
+      addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click,
+                        icon = icons, label=~as.character(name)) %>%
+      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+  })
+
+  
   
   
 })
