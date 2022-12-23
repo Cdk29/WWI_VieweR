@@ -16,9 +16,9 @@ library(digest)
 
 getColor <- function(ww_data) {
   lapply(ww_data$result, function(result) {
-    if(grepl(pattern= "British|Italian|French|Belgian|Allied|Canadian", result)) {
+    if(grepl(pattern= "British|Italian|French|Belgian|Entente|Allied|Canadian|Australian", result)) {
       "blue"
-    }  else if (grepl(pattern= "German|Entente|Austro|Bulgarian", result)) {
+    }  else if (grepl(pattern= "German|Austro|Bulgarian", result)) {
       "black"
     }  else if (grepl(pattern= "Ottoman Victory", result, ignore.case = TRUE)) {
       "black"
@@ -35,9 +35,9 @@ getColor <- function(ww_data) {
 
 getColor_icon <- function(ww_data) {
   lapply(ww_data$result, function(result) {
-    if(grepl(pattern= "British|Italian|French|Belgian|Allied|Canadian", result)) {
+    if(grepl(pattern= "British|Italian|French|Belgian|Entente|Allied|Canadian", result)) {
       "black"
-    }  else if (grepl(pattern= "German|Entente|Austro|Bulgarian", result)) {
+    }  else if (grepl(pattern= "German|Austro|Bulgarian", result)) {
       "white"
     } else {
       "purple"
@@ -73,13 +73,13 @@ load_battles <- function(csv_file) {
 }
 
 #ajouter dans pal, retirer des levels
-pal <- colorFactor(pal = c("blue", "black", "orange"), domain = c("Allied Victory", "Uknown", "Entente Victory"))
+pal <- colorFactor(pal = c("blue", "black", "orange"), domain = c("Allied Victory", "German Victory","Uknown"))
 
 pal_middle_eastern <- colorFactor(pal = c("blue", "green","black", "orange"),
                                   domain = c("Allied Victory", "Uknown", "Ottoman Victory", "Ottoman Defeat"))
 
 pal_global <- colorFactor(pal = c("blue", "black", "black", "green", "orange", "red", "white"),
-              domain = c("Allied Victory", "Ottoman Victory",  "Entente Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
+              domain = c("Allied Victory", "Ottoman Victory",  "Central Powers Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
   
 shinyServer(function(input, output) {
 
@@ -123,7 +123,7 @@ shinyServer(function(input, output) {
       addTiles() %>% setView(mean(European_theatre$long), mean(European_theatre$lat), zoom =7) %>% 
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click, 
                         icon = icons, label=~as.character(name)) %>%  
-      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+      addLegend(pal=pal, values = c("Allied Victory", "German Victory","Uknown"))
     }) 
 
   output$Middle_Eastern_map <- renderLeaflet({
@@ -157,7 +157,7 @@ shinyServer(function(input, output) {
       addTiles() %>% setView(mean(African_theatre_of_World_War_I$long), mean(African_theatre_of_World_War_I$lat), zoom =7) %>% 
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click, 
                         icon = icons, label=~as.character(name)) %>%  
-      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Central Powers Victory"))
   }) 
   
   output$Asian_and_Pacific_map <- renderLeaflet({
@@ -174,7 +174,7 @@ shinyServer(function(input, output) {
       addTiles() %>% setView(mean(Asian_and_Pacific_theatre_of_World_War_I$long), mean(Asian_and_Pacific_theatre_of_World_War_I$lat), zoom =7) %>%
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click,
                         icon = icons, label=~as.character(name)) %>%
-      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Central Powers Victory"))
   })
   
   output$global_map <- renderLeaflet({
@@ -192,7 +192,7 @@ shinyServer(function(input, output) {
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click,
                         icon = icons, label=~as.character(name)) %>%
       addLegend(pal=pal_global, 
-                values = c("Allied Victory", "Ottoman Victory",  "Entente Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
+                values = c("Allied Victory", "Ottoman Victory",  "Central Powers Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
   })
 
   
