@@ -24,7 +24,7 @@ getColor <- function(ww_data) {
       "black"
     }   else if (grepl(pattern= "retreat|defeat .* Ottoman", result, ignore.case = TRUE)) {
       "green"
-    } else if (grepl(pattern= "White victory|Soviet retreat|Red retreat", result, ignore.case = TRUE)) {
+    } else if (grepl(pattern= "White victory|Soviet retreat|Red retreat|Japan", result, ignore.case = TRUE)) {
       "white"
     } else if (grepl(pattern= "Red breakthrough|Red victory", result, ignore.case = TRUE)) {
       "red"
@@ -39,6 +39,8 @@ getColor_icon <- function(ww_data) {
       "black"
     }  else if (grepl(pattern= "German|Austro|Bulgarian", result)) {
       "white"
+    }  else if (grepl(pattern= "Japan", result)) {
+      "red"
     } else {
       "purple"
     } })
@@ -78,8 +80,8 @@ pal <- colorFactor(pal = c("blue", "black", "orange"), domain = c("Allied Victor
 pal_middle_eastern <- colorFactor(pal = c("blue", "green","black", "orange"),
                                   domain = c("Allied Victory", "Uknown", "Ottoman Victory", "Ottoman Defeat"))
 
-pal_global <- colorFactor(pal = c("blue", "black", "black", "green", "orange", "red", "white"),
-              domain = c("Allied Victory", "Ottoman Victory",  "Central Powers Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
+pal_global <- colorFactor(pal = c("blue", "black","white", "green", "black", "red", "orange","white"),
+              domain = c("Allied Victory", "Ottoman Victory",  "Central Powers Victory", "Ottoman Defeat", "Uknown", "Red Victory", "Japan Victory", "White victory"))
   
 shinyServer(function(input, output) {
 
@@ -192,7 +194,7 @@ shinyServer(function(input, output) {
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click,
                         icon = icons, label=~as.character(name)) %>%
       addLegend(pal=pal_global, 
-                values = c("Allied Victory", "Ottoman Victory",  "Central Powers Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
+                values = c("Allied Victory", "Ottoman Victory",  "Central Powers Victory", "Ottoman Defeat", "Uknown", "Red Victory", "Japan Victory", "White victory"))
   })
 
   
