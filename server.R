@@ -24,7 +24,9 @@ getColor <- function(ww_data) {
       "black"
     }   else if (grepl(pattern= "retreat|defeat .* Ottoman", result, ignore.case = TRUE)) {
       "green"
-    } else if (grepl(pattern= "arab", result, ignore.case = TRUE)) {
+    } else if (grepl(pattern= "White victory|Soviet retreat|Red retreat", result, ignore.case = TRUE)) {
+      "white"
+    } else if (grepl(pattern= "Red breakthrough|Red victory", result, ignore.case = TRUE)) {
       "red"
     } else {
       "orange"
@@ -72,7 +74,9 @@ pal <- colorFactor(pal = c("blue", "black", "orange"), domain = c("Allied Victor
 pal_middle_eastern <- colorFactor(pal = c("blue", "green","black", "orange"),
                                   domain = c("Allied Victory", "Uknown", "Ottoman Victory", "Ottoman Defeat"))
 
-
+pal_global <- colorFactor(pal = c("blue", "black", "black", "green", "orange", "red", "white"),
+              domain = c("Allied Victory", "Ottoman Victory",  "Entente Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
+  
 shinyServer(function(input, output) {
 
   European_theatre  <- load_battles("European_theatre_of_World_War_I.csv")
@@ -183,7 +187,8 @@ shinyServer(function(input, output) {
       addTiles() %>% setView(mean(global_theatre_of_World_War_I$long), mean(global_theatre_of_World_War_I$lat), zoom =7) %>%
       addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click,
                         icon = icons, label=~as.character(name)) %>%
-      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+      addLegend(pal=pal_global, 
+                values = c("Allied Victory", "Ottoman Victory",  "Entente Victory", "Ottoman Defeat", "Uknown", "Red Victory", "White victory"))
   })
 
   
