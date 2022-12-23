@@ -20,6 +20,12 @@ getColor <- function(ww_data) {
       "blue"
     }  else if (grepl(pattern= "German|Entente|Austro|Bulgarian", result)) {
       "black"
+    }  else if (grepl(pattern= "Ottoman Victory", result, ignore.case = TRUE)) {
+      "black"
+    }   else if (grepl(pattern= "retreat|defeat .* Ottoman", result, ignore.case = TRUE)) {
+      "green"
+    } else if (grepl(pattern= "arab", result, ignore.case = TRUE)) {
+      "red"
     } else {
       "orange"
     } })
@@ -57,17 +63,36 @@ load_battles <- function(csv_file) {
   return(ww_data)
 }
 
+#ajouter dans pal, retirer des levels
 pal <- colorFactor(pal = c("blue", "black", "orange"), domain = c("Allied Victory", "Uknown", "Entente Victory"))
+
+pal_middle_eastern <- colorFactor(pal = c("blue", "green","black", "orange"),
+                                  domain = c("Allied Victory", "Uknown", "Ottoman Victory", "Ottoman Defeat"))
+
 
 shinyServer(function(input, output) {
 
   European_theatre  <- load_battles("European_theatre_of_World_War_I.csv")
   
+  src = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Canadian_tank_and_soldiers_Vimy_1917.jpg/300px-Canadian_tank_and_soldiers_Vimy_1917.jpg"
+  output$image_european_theatre_img<-renderText({c('<img src="',src,'">')})
+  
+  Middle_Eastern_theatre_of_World_War_I  <- load_battles("Middle_Eastern_theatre_of_World_War_I.csv")
+  
+  src_middle = "http://commons.wikimedia.org/wiki/Special:FilePath/G.C._18_March_1915_Gallipoli_Campaign_Article.jpg?width=300"
+  output$Middle_Eastern_theatre_img <-renderText({c('<img src="',src_middle, '">')})
+  
+  African_theatre_of_World_War_I  <- load_battles("African_theatre_of_World_War_I.csv")
+  
+  src_africa = "http://commons.wikimedia.org/wiki/Special:FilePath/German_trenches_in_Garua.jpg?width=300"
+  output$African_theatre_img <- renderText({c('<img src="',src_africa, '">')})
+  
+  Asian_and_Pacific_theatre_of_World_War_I  <- load_battles("Asian_and_Pacific_theatre_of_World_War_I.csv")
+  
+  src_asia = "http://commons.wikimedia.org/wiki/Special:FilePath/Bundesarchiv_Bild_134-C1299,_Tsingtau,_Vorderste_deutsche_Frontlinie.jpg?width=300"
+  output$Asian_and_Pacific_theatre_img <- renderText({c('<img src="',src_asia, '">')})
   
   output$European_map <- renderLeaflet({
-
-    src = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Canadian_tank_and_soldiers_Vimy_1917.jpg/300px-Canadian_tank_and_soldiers_Vimy_1917.jpg"
-    output$image<-renderText({c('<img src="',src,'">')})
     
     European_theatre <- European_theatre %>% filter(between(as.Date(date), as.Date(input$sliderInputdate[1]), as.Date(input$sliderInputdate[2]))) #%>% 
     European_theatre <- European_theatre[grepl(x = European_theatre$campaign, pattern = paste(input$CampaignInput, collapse = "|")),]
@@ -84,5 +109,57 @@ shinyServer(function(input, output) {
       addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
     }) 
 
+  output$Middle_Eastern_map <- renderLeaflet({
+    
+    Middle_Eastern_theatre_of_World_War_I <- Middle_Eastern_theatre_of_World_War_I %>% filter(between(as.Date(date), as.Date(input$sliderInputdate_middle_eastern[1]), as.Date(input$sliderInputdate_middle_eastern[2]))) #%>% 
+    Middle_Eastern_theatre_of_World_War_I <- Middle_Eastern_theatre_of_World_War_I[grepl(x = Middle_Eastern_theatre_of_World_War_I$campaign, pattern = paste(input$CampaignInput_middle_eastern, collapse = "|")),]
+    icons <- awesomeIcons(
+      icon = 'ios-close',
+      iconColor = unlist(getColor_icon(Middle_Eastern_theatre_of_World_War_I)),
+      library = 'ion',
+      markerColor = unlist(getColor(Middle_Eastern_theatre_of_World_War_I))
+    )
+    Middle_Eastern_theatre_of_World_War_I %>% leaflet() %>%
+      addTiles() %>% setView(mean(Middle_Eastern_theatre_of_World_War_I$long), mean(Middle_Eastern_theatre_of_World_War_I$lat), zoom =7) %>% 
+      addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click, 
+                        icon = icons, label=~as.character(name)) %>%  
+      addLegend(pal=pal_middle_eastern, values = c("Allied Victory", "Uknown", "Ottoman Victory", "Ottoman Defeat"))
+  }) 
+  
+  output$African_map <- renderLeaflet({
+    
+    African_theatre_of_World_War_I <- African_theatre_of_World_War_I %>% filter(between(as.Date(date), as.Date(input$sliderInputdate_African[1]), as.Date(input$sliderInputdate_African[2]))) #%>% 
+    African_theatre_of_World_War_I <- African_theatre_of_World_War_I[grepl(x = African_theatre_of_World_War_I$campaign, pattern = paste(input$CampaignInput_African, collapse = "|")),]
+    icons <- awesomeIcons(
+      icon = 'ios-close',
+      iconColor = unlist(getColor_icon(African_theatre_of_World_War_I)),
+      library = 'ion',
+      markerColor = unlist(getColor(African_theatre_of_World_War_I))
+    )
+    African_theatre_of_World_War_I %>% leaflet() %>%
+      addTiles() %>% setView(mean(African_theatre_of_World_War_I$long), mean(African_theatre_of_World_War_I$lat), zoom =7) %>% 
+      addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click, 
+                        icon = icons, label=~as.character(name)) %>%  
+      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+  }) 
+  
+  output$Asian_and_Pacific_map <- renderLeaflet({
+
+    Asian_and_Pacific_theatre_of_World_War_I <- Asian_and_Pacific_theatre_of_World_War_I %>% filter(between(as.Date(date), as.Date(input$sliderInputdate_Asian_and_Pacific[1]), as.Date(input$sliderInputdate_Asian_and_Pacific[2]))) #%>%
+    Asian_and_Pacific_theatre_of_World_War_I <- Asian_and_Pacific_theatre_of_World_War_I[grepl(x = Asian_and_Pacific_theatre_of_World_War_I$campaign, pattern = paste(input$CampaignInput_Asian_and_Pacific, collapse = "|")),]
+    icons <- awesomeIcons(
+      icon = 'ios-close',
+      iconColor = unlist(getColor_icon(Asian_and_Pacific_theatre_of_World_War_I)),
+      library = 'ion',
+      markerColor = unlist(getColor(Asian_and_Pacific_theatre_of_World_War_I))
+    )
+    Asian_and_Pacific_theatre_of_World_War_I %>% leaflet() %>%
+      addTiles() %>% setView(mean(Asian_and_Pacific_theatre_of_World_War_I$long), mean(Asian_and_Pacific_theatre_of_World_War_I$lat), zoom =7) %>%
+      addAwesomeMarkers(lat =  ~lat, lng =~long, popup = ~on_click,
+                        icon = icons, label=~as.character(name)) %>%
+      addLegend(pal=pal, values = c("Allied Victory", "Uknown", "Entente Victory"))
+  })
+  
+  
 })
 

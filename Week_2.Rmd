@@ -316,17 +316,31 @@ Edit : after some refactoring, the recursion must go inside got_battles_for_fron
 
 ```
 
+```{r message=FALSE, warning=FALSE}
+World_War_I <- create_front_battle_df("http://dbpedia.org/resource/World_War_I")
+dim(World_War_I)
+write.csv(World_War_I,file='World_War_I.csv', row.names=FALSE)
 
+```
+
+
+```{r message=FALSE, warning=FALSE}
+#bug
+# Eastern_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Eastern_Front_(World_War_I)")
+# dim(Eastern_theatre_of_World_War_I)
+# write.csv(Eastern_theatre_of_World_War_I,file='Eastern_theatre_of_World_War_I.csv', row.names=FALSE)
+
+```
 ## Part 2
 
 *Eastern front tab*: For my second figure, I am going to create a bubble map that plots battles of the first war, on the eastern front map. A sidebar will allow to choose the year, and the markers of each battle will be clickable and display informations (descriptions, causalties, etc.) The data required are contained on the dbpedia page western front. Colors of the battle/bubble will be made based on the campaign color.
 
 Some additionnal data cleaning is required on the fly.
 ```{r message=FALSE, warning=FALSE}
-# Middle_Eastern_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I")
-# dim(Middle_Eastern_theatre_of_World_War_I)
-# head(Middle_Eastern_theatre_of_World_War_I, 3)
-# write.csv(Middle_Eastern_theatre_of_World_War_I,file='Middle_Eastern_theatre_of_World_War_I.csv', row.names=FALSE)
+Middle_Eastern_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Middle_Eastern_theatre_of_World_War_I")
+dim(Middle_Eastern_theatre_of_World_War_I)
+head(Middle_Eastern_theatre_of_World_War_I, 3)
+write.csv(Middle_Eastern_theatre_of_World_War_I,file='Middle_Eastern_theatre_of_World_War_I.csv', row.names=FALSE)
 
 ```
 
@@ -343,10 +357,10 @@ This also include an African map tab and a European tab map.
 ```{r message=FALSE, warning=FALSE}
 #Africa, from https://dbpedia.org/page/African_theatre_of_World_War_I
 
-# African_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/African_theatre_of_World_War_I")
-# dim(African_theatre_of_World_War_I)
-# head(African_theatre_of_World_War_I, 3)
-# write.csv(African_theatre_of_World_War_I,file='African_theatre_of_World_War_I.csv', row.names=FALSE)
+African_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/African_theatre_of_World_War_I")
+dim(African_theatre_of_World_War_I)
+head(African_theatre_of_World_War_I, 3)
+write.csv(African_theatre_of_World_War_I,file='African_theatre_of_World_War_I.csv', row.names=FALSE)
 ```
 
 
@@ -366,10 +380,10 @@ write.csv(European_theatre_of_World_War_I,file='European_theatre_of_World_War_I.
 
 ```{r message=FALSE, warning=FALSE}
 
-# Asian_and_Pacific_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I")
-# dim(Asian_and_Pacific_theatre_of_World_War_I)
-# head(Asian_and_Pacific_theatre_of_World_War_I, 3)
-# write.csv(Asian_and_Pacific_theatre_of_World_War_I,file='Asian_and_Pacific_theatre_of_World_War_I.csv', row.names=FALSE)
+Asian_and_Pacific_theatre_of_World_War_I <- create_front_battle_df("http://dbpedia.org/resource/Asian_and_Pacific_theatre_of_World_War_I")
+dim(Asian_and_Pacific_theatre_of_World_War_I)
+head(Asian_and_Pacific_theatre_of_World_War_I, 3)
+write.csv(Asian_and_Pacific_theatre_of_World_War_I,file='Asian_and_Pacific_theatre_of_World_War_I.csv', row.names=FALSE)
 
 
 ```
@@ -377,8 +391,8 @@ write.csv(European_theatre_of_World_War_I,file='European_theatre_of_World_War_I.
 ### All world
 
 ```{r data_3}
-# all_battles <- rbind(western_front, Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
-# head(all_battles, 3)
-# write.csv(df,file='all_battles_WWI.csv', row.names=FALSE)
+all_battles <- rbind(Middle_Eastern_theatre_of_World_War_I, Asian_and_Pacific_theatre_of_World_War_I, European_theatre_of_World_War_I, African_theatre_of_World_War_I)
+head(all_battles, 3)
+write.csv(df,file='all_battles_WWI.csv', row.names=FALSE)
 
 ```
