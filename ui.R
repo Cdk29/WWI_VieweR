@@ -10,6 +10,7 @@ load_campaign <- function(csv_file) {
   
   campaign <- unlist(str_split(ww_data$campaign, pattern = ","))
   campaign <- str_replace(campaign, pattern = "\\s", "")
+  campaign <- str_replace_all(campaign, "_", " ")
   campaign <- unique(campaign)
   
   

@@ -51,6 +51,8 @@ load_battles <- function(csv_file) {
   ww_data$year <- str_extract(ww_data$year, "^[0-9][0-9][0-9][0-9]")
   ww_data$month <- str_extract(ww_data$month, "^[0-9]+")
   ww_data$day <- str_extract(ww_data$day, "^[0-9]+")
+  ww_data$campaign <- str_replace(ww_data$campaign, pattern = "\\s", "")
+  ww_data$campaign <- str_replace_all(ww_data$campaign, "_", " ")
   ww_data$date <- paste0(ww_data$year, "-", ww_data$month, "-", ww_data$day)
   # ww_data$campaign <- str_replace_all(ww_data$campaign)
   ww_data <- mutate(ww_data, on_click=paste0(paste0('<img src=',
@@ -60,6 +62,8 @@ load_battles <- function(csv_file) {
                                                     '>'),
                                             #'<br><strong>depiction: </strong> ', URLencode(depiction),
                                             '<br><strong>Name: </strong> ', name,
+                                            # '<br><strong>Campaign: </strong> ', str_replace_all(campaign, "_", " "),
+                                            '<br><strong>Campaign: </strong> ', campaign,
                                             '<br><strong>Results: </strong> ', result,
                                             '<br><strong>Date: </strong> ', date,
                                             '<br><strong> Description: </strong>', desc,
