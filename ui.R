@@ -4,6 +4,7 @@ library(shinythemes)
 library(plotly)
 library(stringr)
 
+
 load_campaign <- function(csv_file) {
   
   ww_data <- read.csv(csv_file, stringsAsFactors = FALSE )
@@ -83,6 +84,24 @@ global_theater_tab <- generate_tab_panel("WWI_all_battles.csv", "global_map",
                                          "All the battles of World War I",  "World War I",
                                          "sliderInputdate_global", "CampaignInput_global", "global_theatre_img")
 
+stat_panels <- tabPanel("Some statistics",
+
+# Sidebar layout with input and output definitions ----
+sidebarLayout(
+  
+  # Sidebar panel for inputs ----
+  sidebarPanel(textOutput("Explanation_dot_plots"),
+               textOutput("Explanation_circular")
+    
+    # Input: Slider for the number of bins ----
+  ),
+  
+  # Main panel for displaying outputs ----
+  mainPanel(column(8, 
+    plotlyOutput(outputId = "deaths_plot", height = "600px"),
+    plotOutput(outputId = "circular_bar_plot", width = "130%")
+  ))
+))
 
 navbarPage(theme = shinytheme("sandstone"),
            "WWI VieweR", id="main",
@@ -91,6 +110,7 @@ navbarPage(theme = shinytheme("sandstone"),
            African_theater_tab,
            Asian_and_Pacific_theater_tab,
            global_theater_tab,
+           stat_panels,
            tabPanel("Read Me",includeMarkdown("readme.md")))
 
 
