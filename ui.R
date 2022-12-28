@@ -88,18 +88,18 @@ stat_panels <- tabPanel("Some statistics",
 
 # Sidebar layout with input and output definitions ----
 sidebarLayout(
-  
-  # Sidebar panel for inputs ----
-  sidebarPanel(textOutput("Explanation_dot_plots"),
-               textOutput("Explanation_circular")
-    
-    # Input: Slider for the number of bins ----
-  ),
+
+  # One explanation for the three plots
+  sidebarPanel(h4("About the plots"), includeMarkdown("explanation.md")),
   
   # Main panel for displaying outputs ----
-  mainPanel(column(8, 
-    plotlyOutput(outputId = "deaths_plot", height = "600px"),
-    plotOutput(outputId = "circular_bar_plot", width = "130%")
+  mainPanel( #column(8, 
+    tabsetPanel(type = "tabs",
+                tabPanel("Deaths, absolute count", plotlyOutput(outputId = "deaths_plot", height = "600px")),
+                tabPanel("Percentage of death", plotOutput(outputId = "circular_bar_plot", height = "800px")),
+                tabPanel("Percentage of wounded", plotOutput(outputId = "circular_bar_plot_wounded", height = "800px")),
+                tabPanel("Death and wounded", plotOutput(outputId = "circular_bar_plot_combined", height = "800px"))
+    
   ))
 ))
 
