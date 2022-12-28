@@ -1,4 +1,4 @@
-# Capstone_project
+# WWI VieweR/
 
 The app is hosted here : https://cdk296.shinyapps.io/WWI_VieweR/ 
 
